@@ -1,12 +1,13 @@
 import http from 'node:http';import {randomBytes,scryptSync,timingSafeEqual} from 'node:crypto';import {readFileSync,mkdirSync} from 'node:fs';import {fileURLToPath} from 'node:url';import {dirname,join} from 'node:path';import {openStore} from './store.js';import {ranking,bracket,validScore} from './core.js';import {ManualScoreProvider} from './provider.js';
 import {validateLeague} from './leagues.js';
 import {importScores} from './imports.js';
+import {analytics,simulate} from './analytics.js';
 const root=dirname(fileURLToPath(import.meta.url));
 export function createApp({dbPath=join(root,'data','arena.sqlite'),password=process.env.ADMIN_PASSWORD,secure=process.env.SECURE_COOKIE==='1'}={}){
  if(!password||password.length<12||password.length>128)throw Error('Defina ADMIN_PASSWORD com pelo menos 12 caracteres.');if(dbPath!==':memory:')mkdirSync(dirname(dbPath),{recursive:true});
  const store=openStore(dbPath),provider=new ManualScoreProvider(store),salt=randomBytes(16),hash=scryptSync(password,salt,64),sessions=new Map(),attempts=new Map();
  const reply=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
- const body=async req=>{let b='';for await(const chunk of req){b+=chunk;if(b.length>16384)throw Object.assign(Error('Corpo muito grande'),{status:413});}try{return JSON.parse(b||'{}')}catch{throw Object.assign(Error('JSON inválido'),{status:400});}};
+ const body=async req=>{let b='';for await(const chunk of req){b+=chunk;if(b.length>16384)throw Object.assign(Error('Corpo muito grande'),{status:413});}try{const parsed=JSON.parse(b||'{}');if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('Objeto JSON esperado');return parsed;}catch{throw Object.assign(Error('JSON inválido'),{status:400});}};
  const session=req=>{const token=(req.headers.cookie||'').match(/(?:^|;\s*)arena=([a-f0-9]{64})(?:;|$)/)?.[1],s=sessions.get(token);if(s&&s.exp>Date.now())return {token,...s};if(s)sessions.delete(token);return null;};
  const cookie=(token,maxAge)=>`arena=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure?'; Secure':''}`;
  const clean=(v,max)=>typeof v==='string'?v.trim().slice(0,max):'';
@@ -16,12 +17,14 @@ export function createApp({dbPath=join(root,'data','arena.sqlite'),password=proc
  const participant=auth=>{if(auth?.role!=='participant')fail(401,'Entre com sua conta de participante');};
  const verifyCsrf=(req,auth)=>{if(req.headers['x-csrf-token']!==auth.csrf)fail(403,'Token inválido');};
  const credentials=b=>{const username=typeof b.username==='string'?b.username.trim().toLowerCase():'';if(!/^[a-z0-9_]{3,32}$/.test(username)||typeof b.password!=='string'||b.password.length<12||b.password.length>128)fail(400,'Usuário: 3 a 32 letras, números ou _. Senha: 12 a 128 caracteres.');return {username,password:b.password};};
- const server=http.createServer(async(req,res)=>{try{
+ const server=http.createServer({requestTimeout:15000,headersTimeout:10000,maxHeaderSize:8192},async(req,res)=>{try{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
  const url=new URL(req.url,'http://localhost'),p=url.pathname,method=req.method;const auth=session(req),rawId=url.searchParams.get('league')??'1',id=Number(rawId);
  if(p==='/api/leagues'&&method==='GET')return reply(res,200,{leagues:store.leagues()});
  if(p.startsWith('/api/')&&(!/^\d+$/.test(rawId)||!Number.isSafeInteger(id)||!store.league(id)))fail(404,'Liga não encontrada');
  if(p.startsWith('/api/')&&method==='POST'){if(req.headers['sec-fetch-site']==='cross-site')fail(403,'Origem inválida');if(!req.headers['content-type']?.startsWith('application/json'))fail(415,'Use JSON');}
+ if(p==='/api/analytics'&&method==='GET')return reply(res,200,analytics(store.league(id),store.teams(id),provider.scores(id)));
+ if(p==='/api/simulate'&&method==='POST'){const input=await body(req);return reply(res,200,simulate(store.league(id),store.teams(id),provider.scores(id),input));}
  if(p==='/api/overview'&&method==='GET'){const league=store.league(id),teams=store.teams(id).map(({id,name,status})=>({id,name,status})),scores=provider.scores(id),r=Number(url.searchParams.get('round')||32);if(!Number.isInteger(r)||r<1||r>38)fail(400,'Rodada inválida');const rank=ranking(teams,scores,league.start_round,league.end_round);const roundRank=ranking(teams,scores,r,r).filter(t=>t.played);const best=rank.filter(t=>t.best!==null).sort((a,b)=>b.best-a.best||a.id-b.id)[0]||null;return reply(res,200,{league,source:provider.status(),rank,roundRank,best,bracket:bracket(teams,scores,{qualStart:league.start_round,qualEnd:league.knockout_start-1,start:league.knockout_start,size:league.knockout_size}),approved:teams.filter(t=>t.status==='approved').length});}
  if(p==='/api/account/register'&&method==='POST'){limited(req,'register',12);const {username,password}=credentials(await body(req));const salt=randomBytes(16).toString('hex'),hash=scryptSync(password,salt,64).toString('hex');const accountId=store.createAccount(username,salt,hash);return reply(res,201,issue(req,res,'participant',accountId));}
  if(p==='/api/account/login'&&method==='POST'){const key=limited(req,'participant-login');const {username,password}=credentials(await body(req)),account=store.account(username);const derived=scryptSync(password,account?.salt||'dummy-salt-for-timing',64),expected=account?Buffer.from(account.hash,'hex'):Buffer.alloc(64);if(!timingSafeEqual(derived,expected)||!account)fail(401,'Credenciais inválidas');attempts.delete(key);return reply(res,200,issue(req,res,'participant',account.id));}
