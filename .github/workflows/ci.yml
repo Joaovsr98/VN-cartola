@@ -12,3 +12,36 @@ jobs:
           node-version: '22'
       - run: npm test
       - run: node --check public/app.js
+  migration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arena_test
+          POSTGRES_PASSWORD: test-ci-only
+          POSTGRES_DB: arena_test
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: localhost
+      PGUSER: arena_test
+      PGPASSWORD: test-ci-only
+      PGDATABASE: arena_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate migration against PostgreSQL 16
+        run: |
+          command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+          mkdir -p data
+          node --input-type=module -e "import {openStore} from './store.js'; const s=openStore('data/demo.sqlite'); s.db.close();"
+          node scripts/export-postgres.js data/demo.sqlite data/demo.private.sql --confirm-sensitive
+          psql -v ON_ERROR_STOP=1 -f db/postgres.sql
+          psql -v ON_ERROR_STOP=1 -f data/demo.private.sql
+          test "$(psql -Atc 'SELECT count(*) FROM teams')" = 17
+          test "$(psql -Atc 'SELECT count(*) FROM scores')" = 208
+          if psql -v ON_ERROR_STOP=1 -f data/demo.private.sql; then exit 1; fi
