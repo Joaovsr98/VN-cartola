@@ -19,3 +19,15 @@ Importação manual de até 200 pontuações por lote (ID;rodada;pontos), com pr
 
 ## Bloco 05 — v0.5.0
 Estatísticas de time e histórico por rodada, média e melhor pontuação, simulação hipotética sem alterar o banco. Dados registrados não são parciais ao vivo. Backup SQLite consistente com verificação de integridade e arquivo privado: `node scripts/backup.js data/arena.sqlite backups/arena.sqlite --confirm-sensitive` (crie a pasta backups antes; destino deve ser novo). O backup contém informações privadas e hashes. Não publique. O backend ainda utiliza SQLite; PostgreSQL remoto, notificações e pagamentos não estão ativos.
+
+## Bloco 06 — Docker local
+Requisitos: Docker Engine ou Docker Desktop com Compose v2. Copie .env.example para .env, defina ADMIN_PASSWORD (senha exclusiva de teste, 12–128 caracteres) e execute:
+
+```sh
+docker compose up -d --build --wait
+docker compose ps
+```
+
+Abra http://localhost:3000 (ou altere ARENA_PORT). Os dados SQLite persistem no volume arena_data. Para parar, use docker compose down; não utilize down -v se quiser preservar dados. O container é executado sem root, sem capabilities extras, com sistema de arquivos somente leitura e volume de dados gravável. O acesso é local (loopback), sem TLS, exclusivamente para testes. A CI executa testes dentro do Docker e verifica persistência ao recriar o container.
+
+Cloudflare: o backend atual usa Node HTTP e SQLite nativo. Não publique diretamente como Worker ou Pages até adaptar runtime, autenticação e persistência. Docker local não equivale a Cloudflare Containers. Nenhum plano pago, deploy ou banco remoto foi criado neste bloco. Dados fictícios e pagamentos desativados.

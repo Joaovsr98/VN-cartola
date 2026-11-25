@@ -45,3 +45,28 @@ jobs:
           test "$(psql -Atc 'SELECT count(*) FROM teams')" = 17
           test "$(psql -Atc 'SELECT count(*) FROM scores')" = 208
           if psql -v ON_ERROR_STOP=1 -f data/demo.private.sql; then exit 1; fi
+
+  docker:
+    runs-on: ubuntu-latest
+    env:
+      ADMIN_PASSWORD: testing-ci-only-12345
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test inside Docker
+        run: docker build --target test .
+      - name: Start runtime
+        run: docker compose up -d --build --wait --wait-timeout 90
+      - name: Verify runtime and create test account
+        run: |
+          curl --fail --silent http://127.0.0.1:3000/api/leagues
+          curl --fail --silent -H 'Content-Type: application/json' -d '{"username":"docker_ci","password":"test-participant-12345"}' http://127.0.0.1:3000/api/account/register
+      - name: Recreate container and verify persistence
+        run: |
+          docker compose down
+          docker compose up -d --wait --wait-timeout 90
+          curl --fail --silent -H 'Content-Type: application/json' -d '{"username":"docker_ci","password":"test-participant-12345"}' http://127.0.0.1:3000/api/account/login
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

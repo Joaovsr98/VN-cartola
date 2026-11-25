@@ -1,0 +1,25 @@
+name: vn-arena
+services:
+  arena:
+    build:
+      context: .
+      target: runtime
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Defina uma senha exclusiva no arquivo .env}
+      HOST: 0.0.0.0
+      PORT: "3000"
+      SECURE_COOKIE: "0"
+    ports:
+      - "127.0.0.1:${ARENA_PORT:-3000}:3000"
+    volumes:
+      - arena_data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+volumes:
+  arena_data:
