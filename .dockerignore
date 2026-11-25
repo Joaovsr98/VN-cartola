@@ -1,4 +1,12 @@
-data
-.env
+**/node_modules
 .git
-node_modules
+.github
+.env
+.env.*
+!.env.example
+data
+backups
+**/*.sqlite*
+**/*.private.sql
+**/*.pem
+**/*.key
