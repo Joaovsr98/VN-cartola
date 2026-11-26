@@ -1,6 +1,6 @@
 FROM node:22-bookworm-slim AS base
 WORKDIR /app
-COPY --chown=node:node package.json server.js store.js core.js leagues.js provider.js imports.js analytics.js worker.js ./
+COPY --chown=node:node package.json server.js store.js core.js leagues.js provider.js imports.js analytics.js worker.js demo-ranking.js ./
 COPY --chown=node:node public ./public
 COPY --chown=node:node scripts ./scripts
 RUN mkdir -p /app/data && chown node:node /app/data

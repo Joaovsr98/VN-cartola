@@ -39,3 +39,6 @@ Em Workers & Pages, importe o repositório VN-cartola, escolha a branch bloco07-
 
 ### Correção 0.6.1 — Cloudflare
 O nome em wrangler.jsonc deve coincidir com o Worker criado: vn-cartola. Configure a branch de produção como bloco07-cloudflare-preview, diretório raiz do repositório, build npm test e deploy npx wrangler deploy. O endpoint /api/health deve retornar JSON com version 0.6.1, mode demo e payments false. A interface mostra a versão no rodapé. Se houver HTML no lugar de JSON, confira se foi implantado o Worker e não somente os assets estáticos. O domínio publicado ainda precisa ser validado. Não contém banco remoto, pagamentos ou dados reais.
+
+### v0.6.2 — Ranking detalhado (prévia)
+Pesquisa por time/cartoleiro, ordenação por total acumulado até a rodada selecionada ou pontos da rodada, evolução da posição, patrimônio e variação simulados, capitão, diferença para o líder, escudos tipográficos próprios e escalações fictícias (11 titulares + 5 reservas). A soma dos pontos individuais demonstrativos corresponde aos pontos da rodada; não representa a regra oficial de pontuação. Rodadas sem resultados não geram parciais, patrimônio ou escalação. Todos os dados são fictícios. Sem pagamentos e sem API externa. A branch D1 continua separada; este bloco não ativa o banco remoto.

@@ -1,6 +1,7 @@
 import {ranking,bracket} from './core.js';
 import {analytics,simulate} from './analytics.js';
-const VERSION='0.6.1';
+import {richRanking,lineup} from './demo-ranking.js';
+const VERSION='0.6.2';
 const league={id:1,name:'Pernas de Pau • Liga piloto',season:2027,start_round:20,end_round:38,knockout_start:30,knockout_size:16};
 const teams=['Atlético Aurora','Furacão FC','Vila United','Estrela FC','Real Zona Sul','Tricolor 27','Bola na Rede','Canarinho FC','Arena City','Alvorada','União FC','Guerreiros','Império FC','Fênix','Nova Geração','Raça FC'].map((name,i)=>({id:i+1,name,status:'approved'}));
 const scores=teams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:4200+((i*1379+round*719+i*round*53)%6900)};}));
@@ -20,10 +21,17 @@ export default {async fetch(req,env){
  if(url.searchParams.get('league')!==null&&url.searchParams.get('league')!=='1')return json({error:'Liga não encontrada'},404);
  if(req.method==='GET'&&p==='/api/leagues')return json({leagues:[league]});
  if(req.method==='GET'&&p==='/api/analytics')return json(analytics(league,teams,scores));
+ if(req.method==='GET'&&p==='/api/team'){
+  const id=Number(url.searchParams.get('id')),round=Number(url.searchParams.get('round')||32);
+  if(!Number.isInteger(round)||round<20||round>38)return json({error:'Rodada inválida'},400);
+  const team=teams.find(t=>t.id===id);if(!team)return json({error:'Time não encontrado'},404);
+  const points=scores.find(s=>s.teamId===id&&s.round===round)?.points??null;
+  return json({team:{id:team.id,name:team.name},round,lineup:lineup(team,round,points),source:'demo'});
+ }
  if(req.method==='GET'&&p==='/api/overview'){
   const round=Number(url.searchParams.get('round')||32);if(!Number.isInteger(round)||round<1||round>38)return json({error:'Rodada inválida'},400);
   const rank=ranking(teams,scores,20,38),best=rank.filter(t=>t.best!==null).sort((a,b)=>b.best-a.best||a.id-b.id)[0]||null;
-  return json({league,source:{mode:'demo',live:false,label:'Dados fictícios'},rank,roundRank:ranking(teams,scores,round,round).filter(t=>t.played),best,bracket:bracket(teams,scores),approved:teams.length});
+  return json({league,source:{mode:'demo',live:false,label:'Dados fictícios'},rank,richRank:richRanking(teams,scores,league,round),round,roundRank:ranking(teams,scores,round,round).filter(t=>t.played),best,bracket:bracket(teams,scores),approved:teams.length});
  }
  if(req.method==='POST'&&p==='/api/simulate'){
   if(req.headers.get('sec-fetch-site')==='cross-site')return json({error:'Origem inválida'},403);
