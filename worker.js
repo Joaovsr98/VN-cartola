@@ -2,7 +2,7 @@ import {ranking,bracket} from './core.js';
 import {analytics,simulate} from './analytics.js';
 import {richRanking,lineup,demoTotal,compareTeams} from './demo-ranking.js';
 import {competition} from './competition.js';
-const VERSION='0.6.8';
+const VERSION='0.6.9';
 const pilot={id:1,name:'Pernas de Pau • Liga piloto',season:2027,start_round:20,end_round:38,knockout_start:30,knockout_size:16};
 const allTeams=['Atlético Aurora','Furacão FC','Vila United','Estrela FC','Real Zona Sul','Tricolor 27','Bola na Rede','Canarinho FC','Arena City','Alvorada','União FC','Guerreiros','Império FC','Fênix','Nova Geração','Raça FC'].map((name,i)=>({id:i+1,name,status:'approved'}));
 const allScores=allTeams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:demoTotal(id,round)};}));
@@ -33,6 +33,19 @@ export default {async fetch(req,env){
  const scores=allScores.filter(s=>ids.has(s.teamId));
  if(req.method==='GET'&&p==='/api/leagues')return json({leagues:catalog});
  if(req.method==='GET'&&p==='/api/analytics')return json(analytics(league,teams,scores));
+ if(req.method==='GET'&&p==='/api/opponents'){
+  const id=Number(url.searchParams.get('id')),round=Number(url.searchParams.get('round')||32);
+  if(!Number.isInteger(round)||round<league.start_round||round>league.end_round||!Number.isSafeInteger(id)||id<1)return json({error:'Consulta inválida'},400);
+  const selected=teams.find(t=>t.id===id);if(!selected)return json({error:'Time não encontrado nesta liga'},404);
+  const byTeam=new Map(scores.filter(s=>s.round===round).map(s=>[s.teamId,s.points]));
+  const left=lineup(selected,round,byTeam.get(id)??null);
+  const opponents=left?teams.filter(t=>t.id!==id).map(t=>{
+   const right=lineup(t,round,byTeam.get(t.id)??null),c=compareTeams(left,right);
+   if(!c)return {id:t.id,name:t.name,points:null,commonCount:null,difference:null};
+   return {id:t.id,name:t.name,points:c.rightPoints,commonCount:c.commonCount,difference:c.difference};
+  }).sort((a,b)=>(b.commonCount??-1)-(a.commonCount??-1)||(b.points??-Infinity)-(a.points??-Infinity)||a.id-b.id):[];
+  return json({round,team:{id:selected.id,name:selected.name,points:left?.points??null},available:!!left,opponents,source:'demo'});
+ }
  if(req.method==='GET'&&p==='/api/compare'){
   const a=Number(url.searchParams.get('a')),b=Number(url.searchParams.get('b')),round=Number(url.searchParams.get('round')||32);
   if(!Number.isInteger(round)||round<20||round>38||a===b)return json({error:'Comparação inválida'},400);

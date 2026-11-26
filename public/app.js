@@ -61,12 +61,12 @@ function drawRich(){
   row.append(pos,crest,info,partial,total);row.onclick=()=>openTeam(t);root.append(row);
  }if(!list.length)root.append(el('p','Nenhum participante encontrado.'));
 }
-let detailTeam=null,detailRound=32,detailMode='field',compareRequest=0,detailLineup=null;
+let detailTeam=null,detailRound=32,detailMode='field',compareRequest=0,detailLineup=null,opponentsRequest=0,opponentsCache=null;
 function detailView(mode){detailMode=mode;$('#pitchSection').hidden=mode!=='field'||!detailLineup;$('#teamPlayers').hidden=mode!=='list'||!detailLineup;$('#comparePanel').hidden=mode!=='compare';for(const [id,key] of [['#showField','field'],['#showList','list'],['#showCompare','compare']]){$(id).classList.toggle('active',mode===key);$(id).setAttribute('aria-pressed',String(mode===key));}if(mode==='compare')loadComparison();}
 function openTeam(t){detailTeam=t;detailRound=Number(rankRound.value)||32;detailMode='field';return loadTeam();}
 async function loadTeam(){
- const t=detailTeam;if(!t)return;const request=++detailRequest;++compareRequest;detailLineup=null;activeFavoriteTeam=t.id;updateFavoriteButtons();$('#teamTitle').textContent=t.name;$('#detailRound').textContent='Rodada '+detailRound;$('#detailPrev').disabled=detailRound<=20;$('#detailNext').disabled=detailRound>=38;$('#teamSubtitle').textContent='Carregando escalação demonstrativa…';
- for(const id of ['#teamPlayers','#pitch','#detailMetrics','#compareResult'])$(id).replaceChildren();
+ const t=detailTeam;if(!t)return;const request=++detailRequest;++compareRequest;++opponentsRequest;opponentsCache=null;$('#loadOpponents').disabled=false;detailLineup=null;activeFavoriteTeam=t.id;updateFavoriteButtons();$('#teamTitle').textContent=t.name;$('#detailRound').textContent='Rodada '+detailRound;$('#detailPrev').disabled=detailRound<=20;$('#detailNext').disabled=detailRound>=38;$('#teamSubtitle').textContent='Carregando escalação demonstrativa…';
+ for(const id of ['#teamPlayers','#pitch','#detailMetrics','#compareResult','#opponentsResult'])$(id).replaceChildren();
  for(const id of ['#pitchSection','#teamBudget','#coachInfo','#detailMetrics','#detailView','#comparePanel','#teamPlayers'])$(id).hidden=true;
  if(!teamDialog.open)teamDialog.showModal();
  try{const d=await api('team?id='+t.id+'&round='+detailRound);if(request!==detailRequest||!teamDialog.open)return;
@@ -84,10 +84,21 @@ async function loadComparison(){
  for(const group of c.groups){root.append(el('h3',group.position));for(const item of group.rows){const row=el('div',undefined,'compare-row'+(item.common?' common-player':''));for(const p of [item.left,item.right]){const cell=el('div',undefined,'compare-cell');cell.append(el('strong',p?p.name+(p.captain?' · C':''):'—'),el('b',fmt(p?.points)),el('small',p?p.club+' · '+signed(p.valuation):''));row.append(cell);}root.append(row);}}
  }catch(e){if(req===compareRequest)root.textContent=e.message;}
 }
+async function loadOpponents(){
+ const root=$('#opponentsResult');if(!detailTeam||!detailLineup)return;
+ const req=++opponentsRequest,button=$('#loadOpponents');button.disabled=true;root.textContent='Consultando adversários…';
+ try{
+  const d=opponentsCache||await api('opponents?id='+detailTeam.id+'&round='+detailRound);
+  if(req!==opponentsRequest||!teamDialog.open)return;opponentsCache=d;root.replaceChildren();
+  if(!d.available||!d.opponents.length){root.append(el('p','Nenhum adversário com resultados disponíveis.'));return;}
+  for(const t of d.opponents){const row=el('button',undefined,'opponent-row');row.type='button';const info=el('div',undefined,'opponent-info');info.append(el('strong',t.name),el('small',t.points==null?'Sem resultado':fmt(t.points)+' pts · diferença '+signed(t.difference)+' pts'));const common=el('strong',t.commonCount==null?'—':t.commonCount+'/11','opponent-count');row.append(info,common);row.disabled=t.commonCount==null;row.onclick=()=>{$('#compareTeam').value=String(t.id);loadComparison();$('#compareResult').scrollIntoView({block:'nearest'});};root.append(row);}
+ }catch(e){if(req===opponentsRequest)root.textContent=e.message;}finally{if(req===opponentsRequest)button.disabled=false;}
+}
+$('#loadOpponents').onclick=loadOpponents;
 $('#showField').onclick=()=>detailView('field');$('#showList').onclick=()=>detailView('list');$('#showCompare').onclick=()=>detailView('compare');$('#compareTeam').onchange=loadComparison;
 $('#detailPrev').onclick=()=>{detailRound=Math.max(20,detailRound-1);loadTeam();};$('#detailNext').onclick=()=>{detailRound=Math.min(38,detailRound+1);loadTeam();};
 rankSearch.oninput=drawRich;rankSort.onchange=drawRich;rankRound.onchange=()=>{$('#roundSelect').value=rankRound.value;refresh().catch(err);};
-$('#closeTeam').onclick=()=>teamDialog.close();teamDialog.addEventListener('close',()=>{detailRequest++;compareRequest++;});
+$('#closeTeam').onclick=()=>teamDialog.close();teamDialog.addEventListener('close',()=>{detailRequest++;compareRequest++;opponentsRequest++;});
 function renderPodium(d){
  const section=$('#podiumSection'),root=$('#podium'),list=d.podium||[];root.replaceChildren();section.hidden=!list.length;
  if(!list.length)return;

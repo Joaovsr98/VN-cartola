@@ -60,3 +60,6 @@ Catálogo de três ligas fictícias (liga piloto com 16, duas ligas com oito tim
 
 ### v0.6.8 — Comparação de times
 Detalhes por rodada, alternância campo/lista, comparação de dois times da mesma liga por posição, destaque de titulares comuns por ID, valorização ilustrativa, pontos com/sem bônus de capitão. A base fictícia foi regenerada com atletas estáveis, pontuação base comum e bônus demonstrativo de 50%; totais e patrimônio fictícios podem mudar em relação às versões anteriores. Não representa scouts ou regras oficiais do Cartola; técnico e reservas não pontuam nesta simulação. Sem integração externa, banco remoto ou pagamentos.
+
+### v0.6.9 — Adversários da liga
+Comparação em lote de todos os outros times da liga na rodada selecionada, ordenada por titulares em comum e pontuação. Uma consulta retorna os resumos; seleção abre o comparativo individual. Cache somente durante a visualização atual, sem atualização automática. Rodadas sem dados não geram resultados. Dados fictícios, sem cobranças, integração real ou D1 ativo.
