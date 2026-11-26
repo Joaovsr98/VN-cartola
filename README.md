@@ -93,3 +93,6 @@ Organizador autenticado pode cadastrar time aprovado pelo nome e ID público ou 
 
 ### v0.7.7 — Inscrição por nome e visual esportivo
 ID público opcional na inscrição por convite; ausência recebe marcador interno, não ID real. Administrador deve vincular o ID numérico, único, antes de aprovar. Erros de formulário específicos, confirmação em destaque e continuidade para login. Tema claro com cabeçalho grafite, âmbar vibrante, contraste e formulário responsivo. Sem migração adicional ou consulta oficial. Não aceitar senhas do Cartola. Testar fluxo online antes de divulgar.
+
+### v0.7.8 — Gestão da liga beta
+Busca por nome/ID, filtros por situação e paginação com totais globais e filtrados. Correção administrativa de ID mediante confirmação de identidade, somente antes de qualquer pontuação, com auditoria e unicidade. Resumo da classificação real para aprovados, sem misturar demonstração. Sem nova migração, pagamentos, integração externa, autenticação definitiva ou escalação persistente. Validar deploy e testes no Worker.

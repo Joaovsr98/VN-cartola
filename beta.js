@@ -68,11 +68,27 @@ export async function betaRoute(req,env,path,readInput,json){
    if(changed.meta.changes!==1)fail(404,'Participante não encontrado.');return reply({accessKey:access});
   }
   if(path==='/api/beta/admin/members'&&method==='GET'){
-   const q=new URL(req.url).searchParams,offset=Number(q.get('offset')??0);
-   if(!Number.isSafeInteger(offset)||offset<0)fail(400,'Página inválida.');
-   const [rows,counts]=await db.batch([db.prepare('SELECT id,team_name,external_id,status,created_at FROM beta_members ORDER BY created_at,id LIMIT 50 OFFSET ?').bind(offset),db.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END),0) AS pending FROM beta_members")]);
-   const {total,pending}=counts.results[0];
-   return reply({members:rows.results,total,pending,offset,nextOffset:offset+rows.results.length<total?offset+rows.results.length:null});
+   const q=new URL(req.url).searchParams,offset=Number(q.get('offset')??0),filter=q.get('status')||'all',search=(q.get('q')||'').trim().slice(0,80);
+   if(!Number.isSafeInteger(offset)||offset<0||!['all','pending','approved','rejected','unlinked'].includes(filter))fail(400,'Filtro ou página inválida.');
+   const where="(?='all' OR status=? OR (?='unlinked' AND external_id LIKE 'pending:%')) AND (?='' OR instr(lower(team_name),lower(?))>0 OR instr(external_id,?)>0 AND external_id NOT LIKE 'pending:%')";
+   const args=[filter,filter,filter,search,search,search];
+   const [rows,counts,matching]=await db.batch([
+    db.prepare("SELECT id,team_name,external_id,status,created_at FROM beta_members WHERE "+where+" ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,created_at,id LIMIT 50 OFFSET ?").bind(...args,offset),
+    db.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(status='pending'),0) AS pending,COALESCE(SUM(status='approved'),0) AS approved,COALESCE(SUM(status='rejected'),0) AS rejected,COALESCE(SUM(external_id LIKE 'pending:%'),0) AS unlinked FROM beta_members"),
+    db.prepare("SELECT COUNT(*) AS n FROM beta_members WHERE "+where).bind(...args)
+   ]);
+   const stats=counts.results[0],filtered=matching.results[0].n;
+   return reply({members:rows.results,...stats,filtered,offset,nextOffset:offset+rows.results.length<filtered?offset+rows.results.length:null});
+  }
+  if(path==='/api/beta/admin/edit-id'&&method==='POST'){
+   const d=await readInput(req),external=typeof d.externalId==='string'?d.externalId.trim():'';
+   if(!validToken(d.id)||!/^[1-9]\d{0,19}$/.test(external)||d.verified!==true)fail(400,'Confira o ID público e confirme a identidade do time.');
+   const predicate="id=? AND external_id<>? AND NOT EXISTS(SELECT 1 FROM beta_members WHERE external_id=?) AND NOT EXISTS(SELECT 1 FROM beta_scores WHERE member_id=beta_members.id)";
+   const [,changed]=await db.batch([
+    db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'edit-id','ID corrigido pelo organizador',? FROM beta_members WHERE "+predicate).bind(now(),d.id,external,external),
+    db.prepare("UPDATE beta_members SET external_id=? WHERE "+predicate).bind(external,d.id,external,external)
+   ]);
+   if(changed.meta.changes!==1)fail(409,'ID repetido, inalterado, time inexistente ou com pontuações registradas.');return reply({ok:true});
   }
   if(path==='/api/beta/admin/manual'&&method==='POST'){
    const d=await readInput(req);
@@ -173,7 +189,8 @@ export async function betaRoute(req,env,path,readInput,json){
   const m=await member(db,req);if(m.status!=='approved')fail(403,'Aguarde a aprovação do administrador.');
   const round=Number(new URL(req.url).searchParams.get('round')||38);if(!Number.isInteger(round)||round<1||round>38)fail(400,'Rodada inválida');
   const rows=await db.prepare("SELECT m.team_name AS name,COUNT(s.round) AS played,COALESCE(SUM(s.points),0) AS total,MAX(CASE WHEN s.round=? THEN s.points END) AS roundPoints FROM beta_members m LEFT JOIN beta_scores s ON s.member_id=m.id AND s.round<=? WHERE m.status='approved' GROUP BY m.id,m.team_name ORDER BY CASE WHEN COUNT(s.round)>0 THEN 0 ELSE 1 END,total DESC,m.team_name,m.id").bind(round,round).all();
-  return reply({round,source:'manual',ranking:rows.results.map((r,i)=>({...r,position:r.played?i+1:null})),payments:false});
+  const ranking=rows.results.map((r,i)=>({...r,position:r.played?i+1:null}));
+  return reply({round,source:'manual',ranking,summary:{participants:ranking.length,scored:ranking.filter(r=>r.played>0).length,leader:ranking.find(r=>r.played>0)?.name??null,latestRound:ranking.some(r=>r.roundPoints!==null)?round:null},payments:false});
  }
  return reply({error:'Recurso não encontrado'},404);
 }

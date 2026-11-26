@@ -131,3 +131,24 @@ test('beta: nome sem ID recebe confirmação, requer vínculo antes de aprovaç�
  assert.equal((await link('123')).status,409);assert.equal((await link('456')).status,200);assert.equal((await decision()).status,200);
  assert.equal(db.prepare('SELECT external_id FROM beta_members WHERE id=?').get(id).external_id,'456');
 });
+
+test('beta: busca, filtros, correção de ID sem pontos e proteção dos registros',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';
+ const post=(data,extra={})=>({method:'POST',headers:{'Content-Type':'application/json',Origin:'https://arena.test',...extra},body:JSON.stringify(data)});
+ const admin={Authorization:'Bearer '+env.ADMIN_API_TOKEN};
+ const {invite}=await(await call('/api/beta/admin/invites',post({mode:'group'},admin))).json();
+ const reg=async(teamName,externalId)=>await(await call('/api/beta/register',post({invite,teamName,externalId,consent:true}))).json();
+ const first=await reg('Aurora FC','80');await reg('Outro time','81');await reg('Sem ID','');
+ const id=db.prepare("SELECT id FROM beta_members WHERE external_id='80'").get().id;
+ const list=async q=>(await(await call('/api/beta/admin/members?'+q,{headers:admin})).json());
+ assert.equal((await list('q=aurora')).filtered,1);assert.equal((await list('status=unlinked')).filtered,1);assert.equal((await list('status=pending')).total,3);
+ assert.equal((await call('/api/beta/admin/decision',post({id,status:'approved'},admin))).status,200);
+ assert.equal((await list('status=approved')).approved,1);assert.equal((await list('status=pending')).filtered,2);
+ const edit=(externalId,verified=true)=>call('/api/beta/admin/edit-id',post({id,externalId,verified},admin));
+ assert.equal((await edit('81')).status,409);assert.equal((await edit('90',false)).status,400);assert.equal((await edit('90')).status,200);
+ assert.equal((await call('/api/beta/admin/score',post({id,round:36,points:95.41},admin))).status,200);
+ assert.equal((await edit('91')).status,409);
+ const login=await call('/api/beta/login',post({accessKey:first.accessKey}));const session={Cookie:login.headers.get('Set-Cookie').split(';')[0]};
+ const ranking=await(await call('/api/beta/ranking?round=36',{headers:session})).json();
+ assert.equal(ranking.summary.participants,1);assert.equal(ranking.summary.leader,'Aurora FC');assert.equal(ranking.ranking[0].total,9541);
+});
