@@ -111,3 +111,6 @@ A área de organização fica em `/admin/`, com HTML e JavaScript próprios. A i
 
 ### v0.8.3 — Correção da rota administrativa
 O Worker responde diretamente ao HTML administrativo para `/admin`, `/admin/` e `/admin/index.html`, inclusive com parâmetros de consulta. A rota não depende do tratamento de diretórios pelos assets. O JS e CSS permanecem assets estáticos; autenticação da API e D1 inalterados. O teste simula assets retornando 404 e verifica a página, HEAD e método inválido. Confirmar versão em `/api/health` após deploy.
+
+### v0.8.4 — Preparação de fonte externa
+Adaptador experimental somente leitura para consulta por ID e rodada, restrito ao administrador, desativado por padrão. Não configure `CARTOLA_READ_AUTHORIZED=true` sem autorização expressa da fonte e validação da documentação/temporada. A resposta precisa confirmar ID e rodada; não há gravação de dados externos nem garantia de temporada. Limite global de uma consulta a cada 15 segundos, timeout e limite de resposta; bloqueios não são contornados. Testes usam dados simulados. As pontuações manuais continuam disponíveis. Referência de rotas de terceiros: https://github.com/salomaogabriel/cartola-league/blob/main/cartola-api.md ; termos disponíveis (temporada 2024): https://ajuda.globo/cartola/termos-e-politicas/faq/termo-de-uso.ghtml .

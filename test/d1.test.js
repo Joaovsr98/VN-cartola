@@ -168,3 +168,5 @@ test('beta: última rodada com pontos e destaque somente do próprio time',async
  const d=await(await call('/api/beta/ranking?round=latest',{headers:session})).json();
  assert.equal(d.round,36);assert.equal(d.ranking.filter(x=>x.mine).length,1);assert.equal(d.ranking[0].mine,true);assert.equal(d.ranking[0].name,'Time 91');assert.ok(d.ranking.every(x=>!('memberId' in x)));
 });
+
+test('beta: consulta externa exige administrador e ativação explícita',async t=>{const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';const admin={Authorization:'Bearer '+env.ADMIN_API_TOKEN};assert.equal((await call('/api/beta/admin/cartola/status')).status,401);assert.equal((await(await call('/api/beta/admin/cartola/status',{headers:admin})).json()).enabled,false);const r=await call('/api/beta/admin/cartola/preview',{method:'POST',headers:{...admin,Origin:'https://arena.test','Content-Type':'application/json'},body:JSON.stringify({id:'a'.repeat(64),round:36})});assert.equal(r.status,403);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,0);});
