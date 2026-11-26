@@ -9,7 +9,7 @@
     "run_worker_first": true
   },
   "vars": {
-    "BETA_ENABLED": "false"
+    "BETA_ENABLED": "true"
   },
   "d1_databases": [
     {

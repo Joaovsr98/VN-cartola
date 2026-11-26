@@ -78,3 +78,6 @@ Homologação clara em cinza, branco, preto e dourado; gramado e uniformes ilust
 
 ### v0.7.3 — Controles de acesso e privacidade
 Revogação de convites ainda não utilizados, recuperação assistida após verificação de identidade pelo organizador (substitui chave e invalida sessões), moderação reversível e exclusão da própria conta mediante sessão e chave de acesso. Exclui pontuações e auditoria vinculada da base ativa, inutilizando o convite original; backups seguem a retenção do provedor. Beta permanece desativada no config, sem cobrança. Ainda é necessário aplicar migrações, testar em D1 real, revisar aviso de privacidade e operação de recuperação, verificar proteção contra abuso e confirmar visualmente a interface antes de aceitar pessoas reais.
+
+### Ativação controlada da homologação
+BETA_ENABLED=true somente nas duas configurações do Worker vn-cartolahomologacao. A beta continua fechada sem o binding D1, a migração beta ou um ADMIN_API_TOKEN de comprimento válido. O segredo é configurado exclusivamente no Cloudflare. Primeiro teste com convite individual e dados fictícios: cadastro, login, aprovação, pontuação manual, recuperação e exclusão. Não enviar convites reais antes de validar o fluxo online, a privacidade e a proteção contra abuso. Como as migrações foram aplicadas manualmente, não executar novamente sem reconciliar o histórico.

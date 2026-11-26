@@ -58,3 +58,5 @@ test('beta: revogação, recuperação e exclusão sem reutilização do convite
  for(const table of ['beta_members','beta_scores','beta_sessions','beta_audit'])assert.equal(db.prepare('SELECT COUNT(*) n FROM '+table).get().n,0);
  assert.equal((await call('/api/beta/register',post(data))).status,409);
 });
+
+test('beta remains closed without an administrative secret even when enabled',async t=>{const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';delete env.ADMIN_API_TOKEN;assert.equal((await(await call('/api/beta/status')).json()).enabled,false);assert.equal((await call('/api/beta/register',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://arena.test'},body:'{}'})).status,403);});

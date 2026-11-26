@@ -7,7 +7,7 @@ const validToken=s=>typeof s==='string'&&/^[a-f0-9]{64}$/.test(s);
 const now=()=>Math.floor(Date.now()/1000);
 const cookie=(value,maxAge)=>'__Host-arena_beta='+value+'; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age='+maxAge;
 const sessionToken=req=>req.headers.get('Cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith('__Host-arena_beta='))?.slice('__Host-arena_beta='.length);
-export async function betaReady(env){if(!env.DB||env.BETA_ENABLED!=='true')return false;const row=await env.DB.prepare("SELECT value FROM arena_meta WHERE key='beta'").first();return row?.value==='1';}
+export async function betaReady(env){if(!env.DB||env.BETA_ENABLED!=='true'||typeof env.ADMIN_API_TOKEN!=='string'||env.ADMIN_API_TOKEN.length<32||env.ADMIN_API_TOKEN.length>256)return false;const row=await env.DB.prepare("SELECT value FROM arena_meta WHERE key='beta'").first();return row?.value==='1';}
 async function member(db,req){
  const key=sessionToken(req);if(!validToken(key))fail(401,'Entre com sua chave de acesso.');
  const row=await db.prepare('SELECT m.id,m.team_name,m.external_id,m.status FROM beta_sessions s JOIN beta_members m ON m.id=s.member_id WHERE s.hash=? AND s.expires_at>?').bind(await hash(key),now()).first();
