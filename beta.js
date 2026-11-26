@@ -101,10 +101,21 @@ export async function betaRoute(req,env,path,readInput,json){
    const [changed]=await db.batch([db.prepare('UPDATE beta_members SET team_name=? WHERE id=?').bind(name,d.id),db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'rename','Nome atualizado',? FROM beta_members WHERE id=?").bind(now(),d.id)]);
    if(changed.meta.changes!==1)fail(404,'Time não encontrado.');return reply({ok:true,teamName:name});
   }
+  if(path==='/api/beta/admin/link-id'&&method==='POST'){
+   const d=await readInput(req),external=typeof d.externalId==='string'?d.externalId.trim():'';
+   if(!validToken(d.id)||! /^[1-9]\d{0,19}$/.test(external))fail(400,'Informe um ID público numérico válido.');
+   const predicate="id=? AND external_id LIKE 'pending:%' AND status<>'approved' AND NOT EXISTS(SELECT 1 FROM beta_members WHERE external_id=?)";
+   const [,changed]=await db.batch([
+    db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'link-id','ID público informado pelo organizador',? FROM beta_members WHERE "+predicate).bind(now(),d.id,external),
+    db.prepare("UPDATE beta_members SET external_id=? WHERE "+predicate).bind(external,d.id,external)
+   ]);
+   if(changed.meta.changes!==1)fail(409,'ID já cadastrado ou time sem pendência de identificação.');return reply({ok:true});
+  }
   if(path==='/api/beta/admin/decision'&&method==='POST'){
    const d=await readInput(req);if(!validToken(d.id)||!['approved','rejected'].includes(d.status))fail(400,'Decisão inválida');
-   const [changed]=await db.batch([db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'decision',?,? FROM beta_members WHERE id=? AND status<>?").bind(d.status,now(),d.id,d.status),db.prepare("UPDATE beta_members SET status=? WHERE id=? AND status<>?").bind(d.status,d.id,d.status)]).then(r=>[r[1]]);
-   if(changed.meta.changes!==1)fail(409,'Inscrição não encontrada ou já está neste estado');return reply({ok:true});
+   const predicate="id=? AND status<>? AND (? <> 'approved' OR external_id NOT LIKE 'pending:%')";
+   const [,changed]=await db.batch([db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'decision',?,? FROM beta_members WHERE "+predicate).bind(d.status,now(),d.id,d.status,d.status),db.prepare("UPDATE beta_members SET status=? WHERE "+predicate).bind(d.status,d.id,d.status,d.status)]);
+   if(changed.meta.changes!==1)fail(409,'Inscrição não encontrada, já neste estado ou sem ID público vinculado');return reply({ok:true});
   }
   if(path==='/api/beta/admin/score'&&method==='POST'){
    const d=await readInput(req);if(!validToken(d.id)||!validScore(d.round,d.points))fail(400,'Pontuação inválida');const points=Math.round(d.points*100);
@@ -114,9 +125,12 @@ export async function betaRoute(req,env,path,readInput,json){
   return reply({error:'Recurso não encontrado'},404);
  }
  if(path==='/api/beta/register'&&method==='POST'){
-  const d=await readInput(req),name=cleanName(d.teamName),external=typeof d.externalId==='string'?d.externalId.trim():'';
-  if(!validToken(d.invite)||name.length<2||name.length>80||/[\x00-\x1f\x7f]/.test(name)||!/^([1-9]\d{0,19})$/.test(external)||d.consent!==true)fail(400,'Confira convite, nome, ID do time e aceite.');
-  const id=token(),access=token(),time=now(),invite=await hash(d.invite);
+  const d=await readInput(req),name=cleanName(d.teamName),provided=typeof d.externalId==='string'?d.externalId.trim():'';
+  if(!validToken(d.invite))fail(400,'Código de convite inválido. Confira os 64 caracteres.');
+  if(name.length<2||name.length>80||/[\x00-\x1f\x7f]/.test(name))fail(400,'Informe o nome do time (2 a 80 caracteres).');
+  if(provided&&!/^[1-9]\d{0,19}$/.test(provided))fail(400,'O ID público contém apenas números. Se não souber, deixe em branco. Nunca informe senha.');
+  if(d.consent!==true)fail(400,'Confirme o aceite para continuar.');
+  const id=token(),access=token(),time=now(),invite=await hash(d.invite),external=provided||'pending:'+id;
   const accessHash=await hash(access);
   const invitation=await db.prepare('SELECT expires_at FROM beta_invites WHERE hash=? AND expires_at>?').bind(invite,time).first();
   if(!invitation)fail(409,'Convite inválido, expirado ou revogado.');
@@ -135,7 +149,7 @@ export async function betaRoute(req,env,path,readInput,json){
   }
   if(result.meta.changes!==1)fail(409,'Convite inválido, utilizado, revogado ou time já inscrito.');
   // Return access key independently of session creation, so no account is stranded on session failure.
-  return reply({accessKey:access,status:'pending',teamName:name,message:'Inscrição recebida! Aguarde a aprovação do administrador. Guarde sua chave de acesso.'},201);
+  return reply({accessKey:access,status:'pending',teamName:name,needsId:!provided,message:'Inscrição recebida! Aguarde a aprovação do administrador. Guarde sua chave de acesso.'},201);
  }
  if(path==='/api/beta/login'&&method==='POST'){
   const d=await readInput(req);if(!validToken(d.accessKey))fail(401,'Chave inválida.');

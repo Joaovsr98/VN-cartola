@@ -114,3 +114,20 @@ test('beta: cadastro manual ilimitado por lotes, paginação e acesso posterior'
  const me=await(await call('/api/beta/me',{headers:session})).json();assert.equal(me.member.team_name,'Nome revisado');assert.equal(me.member.status,'approved');
  assert.equal((await call('/api/beta/ranking',{headers:session})).status,200);
 });
+
+test('beta: nome sem ID recebe confirmação, requer vínculo antes de aprovação e impede ID duplicado',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';
+ const post=(data,extra={})=>({method:'POST',headers:{'Content-Type':'application/json',Origin:'https://arena.test',...extra},body:JSON.stringify(data)});
+ const admin={Authorization:'Bearer '+env.ADMIN_API_TOKEN};
+ const {invite}=await(await call('/api/beta/admin/invites',post({mode:'group'},admin))).json();
+ const data={invite,teamName:'Time sem ID',externalId:'',consent:true};
+ const invalid=await call('/api/beta/register',post({...data,externalId:'abc'}));assert.equal(invalid.status,400);assert.match((await invalid.json()).error,/apenas números/);
+ const response=await call('/api/beta/register',post(data));assert.equal(response.status,201);const result=await response.json();assert.equal(result.needsId,true);assert.equal(result.teamName,data.teamName);
+ const id=db.prepare('SELECT id FROM beta_members').get().id;
+ const decision=()=>call('/api/beta/admin/decision',post({id,status:'approved'},admin));
+ assert.equal((await decision()).status,409);
+ assert.equal((await call('/api/beta/register',post({...data,teamName:'Outro time',externalId:'123'}))).status,201);
+ const link=externalId=>call('/api/beta/admin/link-id',post({id,externalId},admin));
+ assert.equal((await link('123')).status,409);assert.equal((await link('456')).status,200);assert.equal((await decision()).status,200);
+ assert.equal(db.prepare('SELECT external_id FROM beta_members WHERE id=?').get(id).external_id,'456');
+});
