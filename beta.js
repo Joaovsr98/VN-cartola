@@ -5,6 +5,8 @@ const token=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),x=>x.toStr
 const hash=async s=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))),x=>x.toString(16).padStart(2,'0')).join('');
 const validToken=s=>typeof s==='string'&&/^[a-f0-9]{64}$/.test(s);
 const now=()=>Math.floor(Date.now()/1000);
+// Reserved sentinel identifies reusable group invitations without a schema migration.
+const GROUP_EXPIRY=253402300799;
 const cookie=(value,maxAge)=>'__Host-arena_beta='+value+'; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age='+maxAge;
 const sessionToken=req=>req.headers.get('Cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith('__Host-arena_beta='))?.slice('__Host-arena_beta='.length);
 export async function betaReady(env){if(!env.DB||env.BETA_ENABLED!=='true'||typeof env.ADMIN_API_TOKEN!=='string'||env.ADMIN_API_TOKEN.length<32||env.ADMIN_API_TOKEN.length>256)return false;const row=await env.DB.prepare("SELECT value FROM arena_meta WHERE key='beta'").first();return row?.value==='1';}
@@ -23,7 +25,12 @@ export async function betaRoute(req,env,path,readInput,json){
  if(method==='POST'&&(req.headers.get('Origin')!==new URL(req.url).origin||req.headers.get('Sec-Fetch-Site')==='cross-site'))fail(403,'Origem inválida');
  if(path.startsWith('/api/beta/admin/')){
   await authorizeAdmin(req,env.ADMIN_API_TOKEN);
-  if(path==='/api/beta/admin/invites'&&method==='POST'){const key=token(),time=now();await db.prepare('INSERT INTO beta_invites VALUES (?,?,?)').bind(await hash(key),time,time+7*86400).run();return reply({invite:key,expiresAt:time+7*86400},201);}
+  if(path==='/api/beta/admin/invites'&&method==='POST'){
+   const d=await readInput(req);if(d.mode!==undefined&&!['group','individual'].includes(d.mode))fail(400,'Tipo de convite inválido.');
+   const group=d.mode==='group',key=token(),time=now(),expiry=group?GROUP_EXPIRY:time+7*86400;
+   await db.prepare('INSERT INTO beta_invites VALUES (?,?,?)').bind(await hash(key),time,expiry).run();
+   return reply({invite:key,mode:group?'group':'individual',expiresAt:group?null:expiry},201);
+  }
   if(path==='/api/beta/admin/revoke-invite'&&method==='POST'){
    const d=await readInput(req);if(!validToken(d.invite))fail(400,'Convite inválido.');
    const result=await db.prepare("UPDATE beta_invites SET expires_at=0 WHERE hash=? AND expires_at>? AND NOT EXISTS(SELECT 1 FROM beta_members WHERE invite_hash=beta_invites.hash)").bind(await hash(d.invite),now()).run();
@@ -51,8 +58,23 @@ export async function betaRoute(req,env,path,readInput,json){
   const d=await readInput(req),name=cleanName(d.teamName),external=typeof d.externalId==='string'?d.externalId.trim():'';
   if(!validToken(d.invite)||name.length<2||name.length>80||/[\x00-\x1f\x7f]/.test(name)||!/^([1-9]\d{0,19})$/.test(external)||d.consent!==true)fail(400,'Confira convite, nome, ID do time e aceite.');
   const id=token(),access=token(),time=now(),invite=await hash(d.invite);
-  const result=await db.prepare("INSERT OR IGNORE INTO beta_members(id,invite_hash,access_hash,team_name,external_id,created_at) SELECT ?,hash,?,?,?,? FROM beta_invites WHERE hash=? AND expires_at>?").bind(id,await hash(access),name,external,time,invite,time).run();
-  if(result.meta.changes!==1)fail(409,'Convite inválido, utilizado ou time já inscrito.');
+  const accessHash=await hash(access);
+  const invitation=await db.prepare('SELECT expires_at FROM beta_invites WHERE hash=? AND expires_at>?').bind(invite,time).first();
+  if(!invitation)fail(409,'Convite inválido, expirado ou revogado.');
+  let result;
+  if(invitation.expires_at===GROUP_EXPIRY){
+   // Each registration receives its own unusable child invite. Existing unique FK and
+   // account deletion stay intact; revoking/deleting one account never disables the group.
+   const child=await hash(token());
+   const results=await db.batch([
+    db.prepare("INSERT INTO beta_invites(hash,created_at,expires_at) SELECT ?,?,0 FROM beta_invites WHERE hash=? AND expires_at=? AND NOT EXISTS(SELECT 1 FROM beta_members WHERE external_id=?)").bind(child,time,invite,GROUP_EXPIRY,external),
+    db.prepare("INSERT OR IGNORE INTO beta_members(id,invite_hash,access_hash,team_name,external_id,created_at) SELECT ?,hash,?,?,?,? FROM beta_invites WHERE hash=? AND expires_at=0").bind(id,accessHash,name,external,time,child),
+    db.prepare("DELETE FROM beta_invites WHERE hash=? AND NOT EXISTS(SELECT 1 FROM beta_members WHERE invite_hash=?)").bind(child,child)
+   ]);result=results[1];
+  }else{
+   result=await db.prepare("INSERT OR IGNORE INTO beta_members(id,invite_hash,access_hash,team_name,external_id,created_at) SELECT ?,hash,?,?,?,? FROM beta_invites WHERE hash=? AND expires_at>? AND expires_at<>?").bind(id,accessHash,name,external,time,invite,time,GROUP_EXPIRY).run();
+  }
+  if(result.meta.changes!==1)fail(409,'Convite inválido, utilizado, revogado ou time já inscrito.');
   // Return access key independently of session creation, so no account is stranded on session failure.
   return reply({accessKey:access,status:'pending',message:'Guarde a chave. Entre com ela para acompanhar a aprovação.'},201);
  }

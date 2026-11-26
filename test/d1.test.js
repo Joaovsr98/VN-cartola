@@ -60,3 +60,21 @@ test('beta: revogação, recuperação e exclusão sem reutilização do convite
 });
 
 test('beta remains closed without an administrative secret even when enabled',async t=>{const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';delete env.ADMIN_API_TOKEN;assert.equal((await(await call('/api/beta/status')).json()).enabled,false);assert.equal((await call('/api/beta/register',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://arena.test'},body:'{}'})).status,403);});
+
+test('beta: convite de grupo reutilizável, sem vencimento, com exclusão isolada e revogação',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';
+ const post=(data,extra={})=>({method:'POST',headers:{'Content-Type':'application/json',Origin:'https://arena.test',...extra},body:JSON.stringify(data)});
+ const admin={Authorization:'Bearer '+env.ADMIN_API_TOKEN};
+ const made=await call('/api/beta/admin/invites',post({mode:'group'},admin));assert.equal(made.status,201);const group=await made.json();assert.equal(group.expiresAt,null);assert.equal(group.mode,'group');
+ const register=externalId=>call('/api/beta/register',post({invite:group.invite,teamName:'Time '+externalId,externalId,consent:true}));
+ const first=await register('101');assert.equal(first.status,201);const {accessKey}=await first.json();
+ assert.equal((await register('102')).status,201);assert.equal((await register('101')).status,409);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM beta_members').get().n,2);
+ assert.equal(db.prepare("SELECT COUNT(*) n FROM beta_members WHERE status='pending'").get().n,2);
+ const login=await call('/api/beta/login',post({accessKey}));const session={Cookie:login.headers.get('Set-Cookie').split(';')[0]};
+ assert.equal((await call('/api/beta/delete',post({confirmation:'EXCLUIR',accessKey},session))).status,200);
+ assert.equal((await register('103')).status,201);
+ assert.equal((await call('/api/beta/admin/revoke-invite',post({invite:group.invite},admin))).status,200);
+ assert.equal((await register('104')).status,409);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM beta_members').get().n,2);
+});
