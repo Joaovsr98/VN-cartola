@@ -70,7 +70,7 @@ async function loadTeam(){
  for(const id of ['#pitchSection','#teamBudget','#coachInfo','#detailMetrics','#detailView','#comparePanel','#teamPlayers'])$(id).hidden=true;
  if(!teamDialog.open)teamDialog.showModal();
  try{const d=await api('team?id='+t.id+'&round='+detailRound);if(request!==detailRequest||!teamDialog.open)return;
- $('#teamSubtitle').textContent='Rodada '+d.round+' · Dados fictícios'+(d.lineup?' · '+fmt(d.lineup.points)+' pontos':' · Sem pontuação registrada');
+ $('#teamSubtitle').textContent='Rodada '+d.round+' · Dados fictícios'+(d.lineup?' · '+fmt(d.lineup.points)+' pontos':d.points!=null?' · '+fmt(d.points)+' pontos · Escalação indisponível':' · Sem pontuação registrada');
  if(!d.lineup)return;detailLineup=d.lineup;$('#detailView').hidden=false;renderPitch(d.lineup);renderBudget(d.lineup);
  const metrics=$('#detailMetrics');metrics.hidden=false;for(const [label,value] of [['Titulares com pontos',d.lineup.players.filter(p=>p.starter&&p.points!=null).length+'/11'],['Com capitão',fmt(d.lineup.points)],['Sem bônus de capitão',fmt(d.lineup.withoutCaptain)]]){const box=el('div');box.append(el('small',label),el('strong',value));metrics.append(box);}
  for(const starter of [true,false]){$('#teamPlayers').append(el('h3',starter?'Titulares':'Reservas'));for(const p of d.lineup.players.filter(p=>p.starter===starter)){const row=el('div',undefined,'playerrow'),name=el('div',p.name+(p.captain?' · C':''));name.append(el('small',p.position+' · '+p.club+(p.price==null?'':' · C$ '+fmt(p.price))));const points=el('div',undefined,'ranknums');points.append(el('strong',fmt(p.points)),el('small',p.valuation==null?'—':signed(p.valuation),p.valuation>0?'gain':p.valuation<0?'loss':''));row.append(name,points);$('#teamPlayers').append(row);}}

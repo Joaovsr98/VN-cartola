@@ -30,16 +30,17 @@ export function compareTeams(left,right){
  const groups=positions.map(position=>{const l=a.filter(p=>p.position===position),r=b.filter(p=>p.position===position),common=l.filter(p=>shared.includes(p.id)),rows=common.map(p=>({left:p,right:r.find(q=>q.id===p.id),common:true}));const la=l.filter(p=>!shared.includes(p.id)),rb=r.filter(p=>!shared.includes(p.id));for(let i=0;i<Math.max(la.length,rb.length);i++)rows.push({left:la[i]??null,right:rb[i]??null,common:false});return {position,rows,leftPoints:l.reduce((s,p)=>s+p.points,0),rightPoints:r.reduce((s,p)=>s+p.points,0)};});
  return {leftPoints:left.points,rightPoints:right.points,difference:left.points-right.points,commonCount:shared.length,commonIds:shared,groups,simulated:true};
 }
+export function recordedLineup(team,round,record){if(!record||record.demoFixture===0)return null;return lineup(team,round,record.points);}
 export function richRanking(teams,scores,league,round){
  const end=Math.min(round,league.end_round);
  const current=ranking(teams,scores,league.start_round,end);
  const previous=ranking(teams,scores,league.start_round,end-1);
  const previousPositions=new Map(previous.filter(t=>t.played>0).map(t=>[t.id,t.position]));
- const byRound=new Map(scores.filter(s=>s.round===round).map(s=>[s.teamId,s.points]));
+ const byRound=new Map(scores.filter(s=>s.round===round).map(s=>[s.teamId,s]));
  const leader=current[0]?.total??0;
  return current.map(t=>{
-  const roundPoints=byRound.get(t.id)??null, prior=previousPositions.get(t.id);
-  const profile=lineup(t,round,roundPoints);
-  return {...t,manager:'Cartoleiro '+String(t.id).padStart(2,'0'),crest:t.name.split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase(),roundPoints,movement:roundPoints===null||prior===undefined?null:prior-t.position,patrimony:roundPoints===null?null:demoPatrimony(t.id,round),valuation:roundPoints===null?null:((t.id*73+round*41)%1101)-550,leaderGap:leader-t.total,captain:profile?.players.find(p=>p.captain)?.name??null};
+  const record=byRound.get(t.id),roundPoints=record?.points??null, prior=previousPositions.get(t.id);
+  const profile=recordedLineup(t,round,record);
+  return {...t,manager:'Cartoleiro '+String(t.id).padStart(2,'0'),crest:t.name.split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase(),roundPoints,movement:roundPoints===null||prior===undefined?null:prior-t.position,patrimony:profile?.budget.patrimony??null,valuation:!profile?null:((t.id*73+round*41)%1101)-550,leaderGap:leader-t.total,captain:profile?.players.find(p=>p.captain)?.name??null};
  });
 }

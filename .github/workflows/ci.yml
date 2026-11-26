@@ -11,7 +11,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm test
-      - run: node --check public/app.js && node --check public/market-ui.js
+      - run: node --check public/app.js && node --check public/market-ui.js && node --check public/beta-ui.js
   migration:
     runs-on: ubuntu-latest
     services:

@@ -1,0 +1,22 @@
+{
+  "name": "vn-cartolahomologacao",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-25",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "vars": {
+    "BETA_ENABLED": "false"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vn-arena-homologacao",
+      "database_id": "63584c14-4bd3-4281-8c2d-51fb7df7a54e",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
