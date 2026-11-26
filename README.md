@@ -99,3 +99,6 @@ Busca por nome/ID, filtros por situação e paginação com totais globais e fil
 
 ### v0.7.9 — Refinamento visual
 Homologação clara preservada. Hero e banner da beta com degradê suave de grafite a chumbo quente, sem círculos decorativos ou sombras pesadas. Cabeçalho integrado ao fundo claro, botões em âmbar suave e navegação ativa discreta. Cards clicáveis e lógica existentes preservados. Sem alterações de autenticação, banco ou regras de campeonato.
+
+### v0.8.0 — Piloto mobile first
+Cabeçalho de ponta a ponta, hero compacto, navegação mobile fixa com acesso direto à liga privada, largura expandida no desktop, painel inicial com cards e jogos lado a lado. A beta não exibe o hero demonstrativo. Convite compartilhável via fragmento de URL, preenchido automaticamente e removido do endereço após leitura; não inclui chave individual. Confirmação de lançamento próxima ao formulário e atualização da inscrição pelo participante. Sem alterações no banco, pagamentos, autenticação definitiva ou integração oficial. Piloto manual: validar cadastro, aprovação, pontuação e ranking em homologação antes de convidar o grupo.
