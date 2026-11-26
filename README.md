@@ -96,3 +96,6 @@ ID público opcional na inscrição por convite; ausência recebe marcador inter
 
 ### v0.7.8 — Gestão da liga beta
 Busca por nome/ID, filtros por situação e paginação com totais globais e filtrados. Correção administrativa de ID mediante confirmação de identidade, somente antes de qualquer pontuação, com auditoria e unicidade. Resumo da classificação real para aprovados, sem misturar demonstração. Sem nova migração, pagamentos, integração externa, autenticação definitiva ou escalação persistente. Validar deploy e testes no Worker.
+
+### v0.7.9 — Refinamento visual
+Homologação clara preservada. Hero e banner da beta com degradê suave de grafite a chumbo quente, sem círculos decorativos ou sombras pesadas. Cabeçalho integrado ao fundo claro, botões em âmbar suave e navegação ativa discreta. Cards clicáveis e lógica existentes preservados. Sem alterações de autenticação, banco ou regras de campeonato.
