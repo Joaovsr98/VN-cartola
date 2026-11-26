@@ -247,3 +247,11 @@ test('beta: agendamento autorizado, parcial isolada e resultado final com tempor
  assert.equal((await call('/api/beta/admin/sync/status')).status,401);
  assert.equal((await call('/api/beta/live')).status,401);
 });
+
+test('beta: falha de mercado gera diagnóstico e pausa consultas por 15 minutos',async t=>{
+ const {db,env}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';env.CARTOLA_READ_AUTHORIZED='true';env.CARTOLA_AUTOSYNC_ENABLED='true';let calls=0;
+ const source={market:async()=>{calls++;throw Object.assign(Error('private error'),{status:503,code:'access-limited',upstreamStatus:403});}};
+ const state=await syncRound(env,source,100);assert.deepEqual(state.issue,{stage:'market',code:'access-limited',httpStatus:403});assert.equal(state.retryAfter,1000);
+ assert.equal((await syncRound(env,source,160)).state,'backoff');assert.equal(calls,1);
+ assert.equal((await syncRound(env,source,1000)).state,'source-limited');assert.equal(calls,2);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,0);
+});

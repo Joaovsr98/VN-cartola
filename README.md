@@ -129,3 +129,6 @@ O período usa 19 rodadas consecutivas: 1–19 ou 20–38, por exemplo. A rodada
 
 ### v0.8.9 — Sincronização programada do piloto 2026
 Cron em homologação a cada minuto, sem chamadas externas enquanto CARTOLA_READ_AUTHORIZED e CARTOLA_AUTOSYNC_ENABLED não estiverem ambos habilitados após autorização e validação da fonte. Lotes de até oito times; parciais rotativas isoladas no D1, sem substituir resultados, com expiração visual e sem regras de reserva. Mercado 2026 precisa estar confirmado. Quando o mercado reabre, tenta a rodada anterior e só grava pontuação se a resposta do time confirmar ID, rodada e temporada 2026; não sobrescreve registros existentes. Sem essa confirmação, não grava. A última rodada exige game_over. Não é importação histórica completa. Consultas reais de times e parciais ainda não validadas. Sem migração. Desabilitar cron/flags se não houver autorização ou se a fonte bloquear acesso.
+
+### v0.8.10 — Diagnóstico da fonte externa
+O painel diferencia timeout, conexão/redirecionamento recusado, status HTTP, bloqueio e formato inválido. Falha do mercado, das parciais globais ou bloqueio gera pausa de 15 minutos antes de nova tentativa. Sem alteração de domínio, sem contornar bloqueios, sem mudança das variáveis de autorização. Não expõe conteúdo de resposta nem erros brutos.

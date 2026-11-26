@@ -5,6 +5,8 @@ const meta=async(db,key)=>(await db.prepare('SELECT value FROM arena_meta WHERE 
 const put=(db,key,value)=>db.prepare('INSERT INTO arena_meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(key,String(value));
 function decode(value){try{return JSON.parse(value);}catch{return null;}}
 export const syncEnabled=env=>cartolaEnabled(env)&&env.CARTOLA_AUTOSYNC_ENABLED==='true';
+const knownCodes=new Set(['timeout','network-or-redirect','http','access-limited','content-type','empty-body','body-limit','body-read','invalid-json','invalid-market']);
+function recordFailure(state,e,stage,time){state.issue={stage,code:knownCodes.has(e?.code)?e.code:'unconfirmed-response',httpStatus:Number.isInteger(e?.upstreamStatus)?e.upstreamStatus:null};if(e?.status===503||stage==='market'||stage==='athletes')state.retryAfter=time+900;}
 const defaultSource={market:readCartolaMarket,team:readCartolaTeam,lineup:readCartolaLineup,athletes:readCartolaAthletes};
 export async function syncStatus(env){
  const saved=env.DB?decode(await meta(env.DB,stateKey)):null;
@@ -15,9 +17,10 @@ export async function syncRound(env,source=defaultSource,time=clock()){
  if(!syncEnabled(env)||!env.DB||env.BETA_ENABLED!=='true')return {state:'disabled'};
  const db=env.DB;
  if(await meta(db,'beta')!=='1')return {state:'disabled'};
+ const previous=decode(await meta(db,stateKey));if(previous?.retryAfter>time)return {state:'backoff',retryAfter:previous.retryAfter};
  const lock=await db.prepare("INSERT INTO arena_meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE CAST(arena_meta.value AS INTEGER)<=?").bind(leaseKey,String(time+55),time).run();
  if(lock.meta.changes!==1)return {state:'busy'};
- let state={state:'waiting',at:time,season,round:null,mode:null,updated:0,failed:0};
+ let state={state:'waiting',at:time,season,round:null,mode:null,updated:0,failed:0},stage='market';
  try{
   const market=await source.market();state.round=market.round;
   if(market.season!==season){state.state='season-unverified';return state;}
@@ -33,7 +36,7 @@ export async function syncRound(env,source=defaultSource,time=clock()){
   let members=(await select.all()).results;
   if(live&&!members.length&&cursor)members=(await db.prepare("SELECT id,external_id FROM beta_members WHERE status='approved' AND external_id NOT LIKE 'pending:%' ORDER BY id LIMIT ?").bind(limit).all()).results;
   if(!members.length){state.state='up-to-date';return state;}
-  const athletes=live?await source.athletes(round):null;
+  stage='athletes';const athletes=live?await source.athletes(round):null;stage='team';
   for(const m of members){
    try{
     if(live){
@@ -53,12 +56,12 @@ export async function syncRound(env,source=defaultSource,time=clock()){
      ]);if(written.meta.changes!==1)continue;
     }
     state.updated++;
-   }catch(e){state.failed++;if(e.status===503){state.state='source-limited';break;}}
+   }catch(e){state.failed++;recordFailure(state,e,'team',time);if(e.status===503){state.state='source-limited';break;}}
    finally{if(live)state.cursor=m.id;}
   }
   if(state.state!=='source-limited')state.state=state.failed?'incomplete':'updated';
   return state;
- }catch(e){state.state=e.status===503?'source-limited':'source-unavailable';return state;}
+ }catch(e){recordFailure(state,e,stage,time);state.state=e.status===503?'source-limited':'source-unavailable';return state;}
  finally{await put(db,stateKey,JSON.stringify(state)).run();}
 }
 export async function liveRanking(env,memberId,time=clock()){
