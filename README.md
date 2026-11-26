@@ -39,3 +39,11 @@ Em Workers & Pages, importe o repositório VN-cartola, escolha a branch bloco07-
 
 ### Correção 0.6.1 — Cloudflare
 O nome em wrangler.jsonc deve coincidir com o Worker criado: vn-cartola. Configure a branch de produção como bloco07-cloudflare-preview, diretório raiz do repositório, build npm test e deploy npx wrangler deploy. O endpoint /api/health deve retornar JSON com version 0.6.1, mode demo e payments false. A interface mostra a versão no rodapé. Se houver HTML no lugar de JSON, confira se foi implantado o Worker e não somente os assets estáticos. O domínio publicado ainda precisa ser validado. Não contém banco remoto, pagamentos ou dados reais.
+
+## Bloco 08 — D1 (v0.7.0, homologação)
+O Worker aceita o binding DB e lê ligas, times aprovados e pontuações diretamente do banco. Sem binding, continua a prévia estática. Com binding indisponível, retorna 503 e não mascara a falha. O endpoint /api/health informa storage d1 somente após consulta. O SQL migrations/0001_demo.sql cria uma base exclusivamente de demonstração. Não execute sobre banco existente de produção.
+1. No painel Cloudflare, crie um D1 separado chamado vn-arena-db. Execute a migração 0001_demo.sql nele (console D1 ou Wrangler). 
+2. Copie o UUID do banco e configure d1_databases em wrangler.jsonc: [{"binding":"DB","database_name":"vn-arena-db","database_id":"UUID_REAL","migrations_dir":"migrations"}]. O UUID não é segredo. Não invente UUID nem adicione tokens ao GitHub.
+3. Publique a branch bloco08-d1-persistencia após validação. Verifique /api/health (version 0.7.0, storage d1, payments false).
+4. Opcional, somente homologação: configure ADMIN_API_TOKEN como secret no Worker (valor aleatório de alta entropia, 32–256 caracteres, nunca compartilhe). POST /api/admin/score aceita Authorization: Bearer TOKEN e JSON {"teamId":1,"round":33,"points":98.5}. Não configure se não precisar; sem secret a escrita fica bloqueada. Pontuação e auditoria são gravadas em um batch transacional. Cadastro, login individual e painel administrativo web permanecem fechados na nuvem.
+Testes D1 usam um adaptador SQLite local que simula a API D1; execução no runtime real ainda depende de binding e deploy. Docker continua usando SQLite independente. Não há integração externa, pagamentos, conta real ou migração de credenciais.
