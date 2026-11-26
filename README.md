@@ -108,3 +108,6 @@ Liga privada abre por padrão quando habilitada e sem navegação explícita. Me
 
 ### v0.8.2 — Administração independente
 A área de organização fica em `/admin/`, com HTML e JavaScript próprios. A interface da liga não contém o painel administrativo da beta nem consulta seus endpoints. A sessão administrativa existente e a autorização server-side continuam válidas; a página de login pode ser acessada por URL, mas dados e operações exigem autorização. Sem migração ou custos. A rota administrativa não deve ser indexada e é servida sem cache. Validar deploy, login, navegação e logout em homologação.
+
+### v0.8.3 — Correção da rota administrativa
+O Worker responde diretamente ao HTML administrativo para `/admin`, `/admin/` e `/admin/index.html`, inclusive com parâmetros de consulta. A rota não depende do tratamento de diretórios pelos assets. O JS e CSS permanecem assets estáticos; autenticação da API e D1 inalterados. O teste simula assets retornando 404 e verifica a página, HEAD e método inválido. Confirmar versão em `/api/health` após deploy.
