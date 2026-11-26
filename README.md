@@ -75,3 +75,6 @@ O arquivo `wrangler.homologacao.jsonc` aponta exclusivamente para o novo banco i
 
 ### Identidade visual
 Homologação clara em cinza, branco, preto e dourado; gramado e uniformes ilustrativos preservados.
+
+### v0.7.3 — Controles de acesso e privacidade
+Revogação de convites ainda não utilizados, recuperação assistida após verificação de identidade pelo organizador (substitui chave e invalida sessões), moderação reversível e exclusão da própria conta mediante sessão e chave de acesso. Exclui pontuações e auditoria vinculada da base ativa, inutilizando o convite original; backups seguem a retenção do provedor. Beta permanece desativada no config, sem cobrança. Ainda é necessário aplicar migrações, testar em D1 real, revisar aviso de privacidade e operação de recuperação, verificar proteção contra abuso e confirmar visualmente a interface antes de aceitar pessoas reais.

@@ -13,7 +13,7 @@ async function member(db,req){
  const row=await db.prepare('SELECT m.id,m.team_name,m.external_id,m.status FROM beta_sessions s JOIN beta_members m ON m.id=s.member_id WHERE s.hash=? AND s.expires_at>?').bind(await hash(key),now()).first();
  if(!row)fail(401,'Sessão inválida ou expirada.');return row;
 }
-async function login(db,id){const key=token(),time=now(),ttl=7*86400;await db.batch([db.prepare('DELETE FROM beta_sessions WHERE expires_at<=?').bind(time),db.prepare('INSERT INTO beta_sessions VALUES (?,?,?)').bind(await hash(key),id,time+ttl)]);return cookie(key,ttl);}
+async function login(db,id,accessHash){const key=token(),time=now(),ttl=7*86400;const [,saved]=await db.batch([db.prepare('DELETE FROM beta_sessions WHERE expires_at<=?').bind(time),db.prepare('INSERT INTO beta_sessions SELECT ?,id,? FROM beta_members WHERE id=? AND access_hash=?').bind(await hash(key),time+ttl,id,accessHash)]);if(saved.meta.changes!==1)fail(401,'Chave inválida.');return cookie(key,ttl);}
 function cleanName(s){if(typeof s!=='string')return '';return s.trim().replace(/\s+/g,' ');}
 export async function betaRoute(req,env,path,readInput,json){
  const reply=(data,status=200,session=null)=>{const r=json(data,status);if(session)r.headers.set('Set-Cookie',session);return r;};
@@ -24,11 +24,21 @@ export async function betaRoute(req,env,path,readInput,json){
  if(path.startsWith('/api/beta/admin/')){
   await authorizeAdmin(req,env.ADMIN_API_TOKEN);
   if(path==='/api/beta/admin/invites'&&method==='POST'){const key=token(),time=now();await db.prepare('INSERT INTO beta_invites VALUES (?,?,?)').bind(await hash(key),time,time+7*86400).run();return reply({invite:key,expiresAt:time+7*86400},201);}
+  if(path==='/api/beta/admin/revoke-invite'&&method==='POST'){
+   const d=await readInput(req);if(!validToken(d.invite))fail(400,'Convite inválido.');
+   const result=await db.prepare("UPDATE beta_invites SET expires_at=0 WHERE hash=? AND expires_at>? AND NOT EXISTS(SELECT 1 FROM beta_members WHERE invite_hash=beta_invites.hash)").bind(await hash(d.invite),now()).run();
+   if(result.meta.changes!==1)fail(409,'Convite inexistente, expirado ou utilizado.');return reply({ok:true});
+  }
+  if(path==='/api/beta/admin/recover'&&method==='POST'){
+   const d=await readInput(req);if(!validToken(d.id)||d.verified!==true)fail(400,'Confirme a identidade do participante fora do sistema.');
+   const access=token(),time=now();const [changed]=await db.batch([db.prepare("UPDATE beta_members SET access_hash=? WHERE id=?").bind(await hash(access),d.id),db.prepare("DELETE FROM beta_sessions WHERE member_id=?").bind(d.id),db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'recover','Chave substituída',? FROM beta_members WHERE id=?").bind(time,d.id)]);
+   if(changed.meta.changes!==1)fail(404,'Participante não encontrado.');return reply({accessKey:access});
+  }
   if(path==='/api/beta/admin/members'&&method==='GET'){const rows=await db.prepare('SELECT id,team_name,external_id,status,created_at FROM beta_members ORDER BY created_at,id LIMIT 100').all();return reply({members:rows.results});}
   if(path==='/api/beta/admin/decision'&&method==='POST'){
    const d=await readInput(req);if(!validToken(d.id)||!['approved','rejected'].includes(d.status))fail(400,'Decisão inválida');
-   const [changed]=await db.batch([db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'decision',?,? FROM beta_members WHERE id=? AND status='pending'").bind(d.status,now(),d.id),db.prepare("UPDATE beta_members SET status=? WHERE id=? AND status='pending'").bind(d.status,d.id)]).then(r=>[r[1]]);
-   if(changed.meta.changes!==1)fail(409,'Inscrição não está pendente');return reply({ok:true});
+   const [changed]=await db.batch([db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'decision',?,? FROM beta_members WHERE id=? AND status<>?").bind(d.status,now(),d.id,d.status),db.prepare("UPDATE beta_members SET status=? WHERE id=? AND status<>?").bind(d.status,d.id,d.status)]).then(r=>[r[1]]);
+   if(changed.meta.changes!==1)fail(409,'Inscrição não encontrada ou já está neste estado');return reply({ok:true});
   }
   if(path==='/api/beta/admin/score'&&method==='POST'){
    const d=await readInput(req);if(!validToken(d.id)||!validScore(d.round,d.points))fail(400,'Pontuação inválida');const points=Math.round(d.points*100);
@@ -48,10 +58,21 @@ export async function betaRoute(req,env,path,readInput,json){
  }
  if(path==='/api/beta/login'&&method==='POST'){
   const d=await readInput(req);if(!validToken(d.accessKey))fail(401,'Chave inválida.');
-  const row=await db.prepare('SELECT id FROM beta_members WHERE access_hash=?').bind(await hash(d.accessKey)).first();if(!row)fail(401,'Chave inválida.');
-  return reply({ok:true},200,await login(db,row.id));
+  const accessHash=await hash(d.accessKey),row=await db.prepare('SELECT id FROM beta_members WHERE access_hash=?').bind(accessHash).first();if(!row)fail(401,'Chave inválida.');
+  return reply({ok:true},200,await login(db,row.id,accessHash));
  }
  if(path==='/api/beta/logout'&&method==='POST'){const key=sessionToken(req);if(validToken(key))await db.prepare('DELETE FROM beta_sessions WHERE hash=?').bind(await hash(key)).run();return reply({ok:true},200,cookie('',0));}
+ if(path==='/api/beta/delete'&&method==='POST'){
+  const d=await readInput(req);if(d.confirmation!=='EXCLUIR'||!validToken(d.accessKey))fail(400,'Confirme a exclusão com sua chave de acesso.');
+  const m=await member(db,req),proof=await hash(d.accessKey),record=await db.prepare('SELECT id FROM beta_members WHERE id=? AND access_hash=?').bind(m.id,proof).first();if(!record)fail(401,'Chave inválida.');
+  const condition='EXISTS(SELECT 1 FROM beta_members WHERE id=? AND access_hash=?)',id=m.id;
+  const result=await db.batch([
+   db.prepare('UPDATE beta_invites SET expires_at=0 WHERE hash=(SELECT invite_hash FROM beta_members WHERE id=? AND access_hash=?)').bind(id,proof),
+   ...['beta_sessions','beta_scores','beta_audit'].map(table=>db.prepare('DELETE FROM '+table+' WHERE member_id=? AND '+condition).bind(id,id,proof)),
+   db.prepare('DELETE FROM beta_members WHERE id=? AND access_hash=?').bind(id,proof)
+  ]);
+  if(result.at(-1).meta.changes!==1)fail(409,'A chave mudou. Entre novamente.');return reply({ok:true},200,cookie('',0));
+ }
  if(path==='/api/beta/me'&&method==='GET'){return reply({member:await member(db,req)});}
  if(path==='/api/beta/ranking'&&method==='GET'){
   const m=await member(db,req);if(m.status!=='approved')fail(403,'Aguarde a aprovação do administrador.');
