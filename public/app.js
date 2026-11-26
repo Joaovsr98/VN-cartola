@@ -90,7 +90,7 @@ function renderPitch(lineup){
  for(const group of lineup.formation){
   const row=el('div',undefined,'pitch-line');row.setAttribute('aria-label',group.label);
   for(const p of group.players){
-   const player=el('div',undefined,'pitch-player'),shirt=el('span',p.captain?'C':p.position,'pitch-shirt'+(p.captain?' captain-shirt':''));
+   const player=el('div',undefined,'pitch-player'),shirt=el('span',p.captain?'C':p.position,'pitch-shirt club-shirt-'+(['Aurora','Vila','Estrela','União','Fênix'].indexOf(p.club)+5)%5+(p.captain?' captain-shirt':''));
    player.append(shirt,el('strong',p.name),el('b',fmt(p.points)));row.append(player);
   }
   root.append(row);

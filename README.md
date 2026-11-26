@@ -48,3 +48,6 @@ Pódio parcial até a rodada escolhida, campo demonstrativo 4-3-3 ao abrir um ti
 
 ### v0.6.4 — Navegação mobile e meu time
 Página inicial, menu inferior, seleção de time fictício para visualizar (sem autenticação ou edição), orçamento em cartoletas com custo dos titulares e técnico e saldo, calendário ilustrativo sem datas reais, atalhos para estatísticas e eliminatórias. Preços e clubes são sintéticos. Técnico sem pontuação nesta simulação. Sem dados oficiais, pagamentos ou conexão D1. Testes de orçamento e calendário adicionados.
+
+### v0.6.5 — Mercado demonstrativo
+Mercado de 48 atletas fictícios, quatro formações, 11 titulares e técnico, escolha de capitão, filtro de posição, busca, orçamento de C$145,75, preenchimento automático pelo menor custo e salvamento local de escalação completa. Não inclui reservas no editor, nem sincronização de contas, resultados ou escalações reais. O simulador roda no navegador e não consome consultas adicionais ao Worker. Uniformes genéricos coloridos, sem escudos oficiais. Testes das regras de escalação adicionados.
