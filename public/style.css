@@ -34,3 +34,5 @@ dialog{width:min(92vw,540px);max-height:85vh;overflow:auto;border:1px solid var(
 .brand,input,select,textarea{color:#20242c}.pitch-player strong{color:#fff}.pitch-player b{color:#f3d994}.captain-shirt{background:#d4af37;color:#17191e;outline-color:#d4af37}.mobile-nav button.active{color:#785b14}.rank-actions button[aria-pressed="true"]{background:#785b14;color:#fff}button.active,form button{color:#fff}button[aria-pressed="true"]{color:#785b14}.crest{color:#fff}#beta form button{color:#fff}
 
 .beta-confirmation{padding:14px;border:1px solid #c9ad67;border-radius:10px;background:#fffaf0;color:#63490c;margin:12px 0}.beta-confirmation p{margin:6px 0;color:#63490c}#betaAdminSummary{font-weight:600}
+
+.manual-team-tools{border:1px solid var(--border);border-radius:10px;padding:12px;margin:16px 0}.manual-team-tools summary{font-weight:600;color:#785b14}#betaAdminPage{align-self:center;font-size:13px}#betaManualResult{font-size:14px;color:#785b14;overflow-wrap:anywhere}

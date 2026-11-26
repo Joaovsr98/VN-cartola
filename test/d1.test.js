@@ -91,3 +91,26 @@ test('beta: admin session persists, expires, revokes on logout and secret rotati
  const expired=await login();db.exec("UPDATE arena_meta SET value='0' WHERE key LIKE 'beta-admin-session:%'");assert.equal((await call('/api/beta/admin/members',{headers:expired})).status,401);
  const rotated=await login();env.ADMIN_API_TOKEN+='rotated';assert.equal((await call('/api/beta/admin/members',{headers:rotated})).status,401);
 });
+
+test('beta: cadastro manual ilimitado por lotes, paginação e acesso posterior',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';
+ const post=(data,extra={})=>({method:'POST',headers:{'Content-Type':'application/json',Origin:'https://arena.test',...extra},body:JSON.stringify(data)});
+ const admin={Authorization:'Bearer '+env.ADMIN_API_TOKEN};
+ const create=(teams,authorized=true,headers=admin)=>call('/api/beta/admin/manual',post({teams,authorized},headers));
+ assert.equal((await create([{externalId:'101'}],true,{})).status,401);
+ assert.equal((await create([{externalId:'101'}],false)).status,400);
+ assert.equal((await create([{externalId:'101'},{externalId:'bad'}])).status,400);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM beta_members').get().n,0);
+ const first=await create([{externalId:'101',teamName:'Meu time'},{externalId:'102'}]);assert.equal(first.status,201);assert.deepEqual((await first.json()).teams.map(x=>x.status),['created','created']);
+ assert.equal(db.prepare("SELECT team_name FROM beta_members WHERE external_id='102'").get().team_name,'Time 102');
+ assert.equal((await(await create([{externalId:'101'}])).json()).teams[0].status,'duplicate');
+ for(let i=0;i<11;i++)assert.equal((await create(Array.from({length:10},(_,j)=>({externalId:String(1000+i*10+j)})))).status,201);
+ const a=await(await call('/api/beta/admin/members',{headers:admin})).json(),b=await(await call('/api/beta/admin/members?offset=50',{headers:admin})).json(),c=await(await call('/api/beta/admin/members?offset=100',{headers:admin})).json();
+ assert.equal(a.total,112);assert.equal(a.pending,0);assert.equal(a.members.length,50);assert.equal(b.members.length,50);assert.equal(c.members.length,12);assert.equal(c.nextOffset,null);assert.equal(new Set([...a.members,...b.members,...c.members].map(x=>x.id)).size,112);
+ const id=db.prepare("SELECT id FROM beta_members WHERE external_id='101'").get().id;
+ assert.equal((await call('/api/beta/admin/rename',post({id,teamName:'Nome revisado'},admin))).status,200);
+ const {accessKey}=await(await call('/api/beta/admin/recover',post({id,verified:true},admin))).json();
+ const login=await call('/api/beta/login',post({accessKey}));assert.equal(login.status,200);const session={Cookie:login.headers.get('Set-Cookie').split(';')[0]};
+ const me=await(await call('/api/beta/me',{headers:session})).json();assert.equal(me.member.team_name,'Nome revisado');assert.equal(me.member.status,'approved');
+ assert.equal((await call('/api/beta/ranking',{headers:session})).status,200);
+});

@@ -67,7 +67,40 @@ export async function betaRoute(req,env,path,readInput,json){
    const access=token(),time=now();const [changed]=await db.batch([db.prepare("UPDATE beta_members SET access_hash=? WHERE id=?").bind(await hash(access),d.id),db.prepare("DELETE FROM beta_sessions WHERE member_id=?").bind(d.id),db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'recover','Chave substituída',? FROM beta_members WHERE id=?").bind(time,d.id)]);
    if(changed.meta.changes!==1)fail(404,'Participante não encontrado.');return reply({accessKey:access});
   }
-  if(path==='/api/beta/admin/members'&&method==='GET'){const rows=await db.prepare('SELECT id,team_name,external_id,status,created_at FROM beta_members ORDER BY created_at,id LIMIT 100').all();return reply({members:rows.results});}
+  if(path==='/api/beta/admin/members'&&method==='GET'){
+   const q=new URL(req.url).searchParams,offset=Number(q.get('offset')??0);
+   if(!Number.isSafeInteger(offset)||offset<0)fail(400,'Página inválida.');
+   const [rows,counts]=await db.batch([db.prepare('SELECT id,team_name,external_id,status,created_at FROM beta_members ORDER BY created_at,id LIMIT 50 OFFSET ?').bind(offset),db.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END),0) AS pending FROM beta_members")]);
+   const {total,pending}=counts.results[0];
+   return reply({members:rows.results,total,pending,offset,nextOffset:offset+rows.results.length<total?offset+rows.results.length:null});
+  }
+  if(path==='/api/beta/admin/manual'&&method==='POST'){
+   const d=await readInput(req);
+   if(d.authorized!==true||!Array.isArray(d.teams)||d.teams.length<1||d.teams.length>10)fail(400,'Confirme a autorização e envie de 1 a 10 times por lote.');
+   const seen=new Set(),items=[];
+   for(const item of d.teams){
+    const external=typeof item?.externalId==='string'?item.externalId.trim():'',name=cleanName(item?.teamName)||'Time '+external;
+    if(!/^[1-9]\d{0,19}$/.test(external)||name.length<2||name.length>80||/[\x00-\x1f\x7f]/.test(name)||seen.has(external))fail(400,'ID ou nome inválido, ou ID repetido no lote.');
+    seen.add(external);items.push({external,name,id:token(),child:await hash(token()),accessHash:await hash(token())});
+   }
+   const time=now(),stmts=[];
+   for(const x of items){
+    stmts.push(
+     db.prepare("INSERT INTO beta_invites(hash,created_at,expires_at) SELECT ?,?,0 WHERE NOT EXISTS(SELECT 1 FROM beta_members WHERE external_id=?)").bind(x.child,time,x.external),
+     db.prepare("INSERT OR IGNORE INTO beta_members(id,invite_hash,access_hash,team_name,external_id,status,created_at) SELECT ?,hash,?,?,?,'approved',? FROM beta_invites WHERE hash=?").bind(x.id,x.accessHash,x.name,x.external,time,x.child),
+     db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'manual','Cadastro administrativo autorizado',? FROM beta_members WHERE id=?").bind(time,x.id),
+     db.prepare("DELETE FROM beta_invites WHERE hash=? AND NOT EXISTS(SELECT 1 FROM beta_members WHERE invite_hash=?)").bind(x.child,x.child)
+    );
+   }
+   const results=await db.batch(stmts);
+   return reply({teams:items.map((x,i)=>({externalId:x.external,teamName:x.name,status:results[i*4+1].meta.changes===1?'created':'duplicate'}))},201);
+  }
+  if(path==='/api/beta/admin/rename'&&method==='POST'){
+   const d=await readInput(req),name=cleanName(d.teamName);
+   if(!validToken(d.id)||name.length<2||name.length>80||/[\x00-\x1f\x7f]/.test(name))fail(400,'Nome inválido.');
+   const [changed]=await db.batch([db.prepare('UPDATE beta_members SET team_name=? WHERE id=?').bind(name,d.id),db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'rename','Nome atualizado',? FROM beta_members WHERE id=?").bind(now(),d.id)]);
+   if(changed.meta.changes!==1)fail(404,'Time não encontrado.');return reply({ok:true,teamName:name});
+  }
   if(path==='/api/beta/admin/decision'&&method==='POST'){
    const d=await readInput(req);if(!validToken(d.id)||!['approved','rejected'].includes(d.status))fail(400,'Decisão inválida');
    const [changed]=await db.batch([db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT id,'decision',?,? FROM beta_members WHERE id=? AND status<>?").bind(d.status,now(),d.id,d.status),db.prepare("UPDATE beta_members SET status=? WHERE id=? AND status<>?").bind(d.status,d.id,d.status)]).then(r=>[r[1]]);
