@@ -2,15 +2,28 @@ const fail=(status,message)=>{throw Object.assign(Error(message),{status});};
 const name=v=>String(v).replace(/[\x00-\x1f\x7f*_~\x60]/g,' ').replace(/\s+/g,' ').trim();
 const pts=v=>v==null?'Aguardando':(v/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' pts';
 const sign='\n\nVN Arena | Pernas de Pau';
-export function reportInput(q){
- const start=Number(q.get('start')),round=Number(q.get('round')),end=start+17;
+export async function readTurn(db){
+ const row=await db.prepare("SELECT value FROM arena_meta WHERE key='beta-turn-start'").first();
+ if(!row)return {start:null,end:null,latestRound:null};
+ const start=Number(row.value);if(!Number.isInteger(start)||start<1||start>21)fail(503,'Configuração de turno inválida.');
+ const end=start+17,latest=await db.prepare("SELECT MAX(s.round) AS latest FROM beta_scores s JOIN beta_members m ON m.id=s.member_id WHERE m.status='approved' AND s.round BETWEEN ? AND ?").bind(start,end).first();
+ return {start,end,latestRound:latest?.latest??null};
+}
+export async function saveTurn(db,start){
+ if(!Number.isInteger(start)||start<1||start>21)fail(400,'Escolha uma rodada inicial entre 1 e 21.');
+ await db.prepare("INSERT INTO arena_meta(key,value) VALUES ('beta-turn-start',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(start)).run();
+ return readTurn(db);
+}
+export function reportInput(q,start){
+ const round=Number(q.get('round')),end=start+17;
  if(!Number.isInteger(start)||start<1||end>38||!Number.isInteger(round)||round<start||round>end)fail(400,'Informe o início do turno e uma rodada dentro das 18 rodadas.');
  const a=q.get('a')||'',b=q.get('b')||'',leg=q.get('leg')||'ida';
  if((a||b)&&(!/^[1-9]\d{0,19}$/.test(a)||!/^[1-9]\d{0,19}$/.test(b)||a===b||!['ida','volta'].includes(leg)))fail(400,'Informe dois IDs diferentes e ida ou volta.');
  return {start,end,round,a,b,leg};
 }
 export async function shareReports(db,q){
- const {start,end,round,a,b,leg}=reportInput(q);
+ const turn=await readTurn(db);if(turn.start===null)fail(409,'Configure o turno antes de gerar mensagens.');
+ const {start,end,round,a,b,leg}=reportInput(q,turn.start);
  const [best,rs,ts,coverage]=await db.batch([
  db.prepare("SELECT m.team_name AS name,s.round,s.points FROM beta_scores s JOIN beta_members m ON m.id=s.member_id WHERE m.status='approved' AND s.round BETWEEN ? AND ? AND s.points=(SELECT MAX(x.points) FROM beta_scores x JOIN beta_members y ON y.id=x.member_id WHERE y.status='approved' AND x.round BETWEEN ? AND ?) ORDER BY s.round,m.team_name,m.id").bind(start,round,start,round),
  db.prepare("SELECT m.team_name AS name,s.points FROM beta_scores s JOIN beta_members m ON m.id=s.member_id WHERE m.status='approved' AND s.round=? ORDER BY s.points DESC,m.team_name,m.id").bind(round),

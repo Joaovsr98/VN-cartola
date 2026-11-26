@@ -120,3 +120,6 @@ Painel administrativo separado: lote manual de até 20 times, prévia e confirma
 
 ### v0.8.6 — Divulgação WhatsApp
 Aba administrativa WhatsApp: Mito do Turno, Melhor da Rodada, Top 32 (provisório até completar as 18 rodadas; empate no corte exige definição), e duelo de ida/volta informado pelo organizador. Cópia e abertura do WhatsApp sem envio automático. Calendário e regra de pontos por vitória/empate ainda não definidos. Sem migração.
+
+### v0.8.7 — Período do turno
+Defina a rodada inicial uma vez em Configurações, com 18 rodadas consecutivas. O período é salvo em arena_meta no D1. Sem período configurado, a geração de mensagens fica bloqueada. A aba WhatsApp lista somente as rodadas do período e sugere a última com pontos. O servidor usa o período salvo, não parâmetros enviados pelo cliente. Alterações não modificam pontos, classificação geral ou calendário dos duelos. Sem migração.
