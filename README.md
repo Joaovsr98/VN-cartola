@@ -63,3 +63,6 @@ Detalhes por rodada, alternância campo/lista, comparação de dois times da mes
 
 ### v0.6.9 — Adversários da liga
 Comparação em lote de todos os outros times da liga na rodada selecionada, ordenada por titulares em comum e pontuação. Uma consulta retorna os resumos; seleção abre o comparativo individual. Cache somente durante a visualização atual, sem atualização automática. Rodadas sem dados não geram resultados. Dados fictícios, sem cobranças, integração real ou D1 ativo.
+
+### Identidade visual
+Produção escura em cinza, branco, preto e dourado; verde/vermelho somente para indicadores esportivos, gramado e uniformes ilustrativos preservados.
