@@ -194,18 +194,33 @@ test('beta: divulgação usa pontos reais, exige admin e distingue classificaç�
  assert.equal((await call('/api/beta/admin/turn')).status,401);
  assert.equal((await call(route,{headers})).status,409);
  assert.equal((await(await call('/api/beta/admin/turn',{headers})).json()).start,null);
- assert.equal((await call('/api/beta/admin/turn',post({start:22}))).status,400);
+ assert.equal((await call('/api/beta/admin/turn',post({start:21}))).status,400);
  assert.equal((await call('/api/beta/admin/turn',post({start:20}))).status,200);
- const config=await(await call('/api/beta/admin/turn',{headers})).json();assert.deepEqual(config,{start:20,end:37,latestRound:null});
+ const config=await(await call('/api/beta/admin/turn',{headers})).json();assert.deepEqual(config,{start:20,end:38,latestRound:null});
  assert.equal((await call('/api/beta/admin/manual',post({authorized:true,teams:[{externalId:'123',teamName:'Time A'},{externalId:'124',teamName:'Time B'}]}))).status,201);
  assert.equal((await call('/api/beta/admin/scores/batch',post({round:35,rows:'123;100\n124;0',apply:true}))).status,200);
  assert.equal((await call('/api/beta/admin/scores/batch',post({round:36,rows:'123;80\n124;90',apply:true}))).status,200);
  const r=await call(route,{headers});assert.equal(r.status,200);const d=await r.json();
  assert.equal(d.complete,false);assert.match(d.messages.mito,/Time A.*100,00/);assert.match(d.messages.better,/🥇 Time B/);assert.match(d.messages.top,/1º Time A.*180,00/);assert.match(d.messages.top,/provisória/);assert.match(d.messages.duel,/Vencedor: Time B/);assert.match(d.messages.duel,/Volta/);
- assert.equal((await call('/api/beta/admin/share?round=38',{headers})).status,400);
+ assert.equal((await call('/api/beta/admin/share?round=39',{headers})).status,400);
  const ignored=await(await call('/api/beta/admin/share?start=1&round=36',{headers})).json();assert.equal(ignored.start,20);
  assert.equal((await(await call('/api/beta/admin/turn',{headers})).json()).latestRound,36);
  assert.equal((await call('/api/beta/admin/turn',post({start:1}))).status,200);
  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,4);
  assert.equal((await call(route,{headers})).status,400);
+});
+
+test('beta: turno de 19 rodadas, configuração antiga e apuração completa somente na 19ª',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';
+ const headers={Authorization:'Bearer '+env.ADMIN_API_TOKEN,Origin:'https://arena.test','Content-Type':'application/json'};
+ const post=data=>({method:'POST',headers,body:JSON.stringify(data)});
+ db.prepare("INSERT INTO arena_meta(key,value) VALUES ('beta-turn-start','21')").run();
+ assert.equal((await(await call('/api/beta/admin/turn',{headers})).json()).start,null);
+ assert.equal((await call('/api/beta/admin/share?round=38',{headers})).status,409);
+ assert.equal((await call('/api/beta/admin/turn',post({start:20}))).status,200);
+ assert.equal((await call('/api/beta/admin/manual',post({authorized:true,teams:[{externalId:'123',teamName:'Time A'}]}))).status,201);
+ for(let round=20;round<=38;round++)assert.equal((await call('/api/beta/admin/scores/batch',post({round,rows:'123;10',apply:true}))).status,200);
+ const previous=await(await call('/api/beta/admin/share?round=37',{headers})).json();assert.equal(previous.complete,false);assert.match(previous.messages.top,/provisória/);
+ const final=await(await call('/api/beta/admin/share?round=38',{headers})).json();assert.equal(final.complete,true);assert.match(final.messages.top,/190,00/);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,19);
 });

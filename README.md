@@ -123,3 +123,6 @@ Aba administrativa WhatsApp: Mito do Turno, Melhor da Rodada, Top 32 (provisóri
 
 ### v0.8.7 — Período do turno
 Defina a rodada inicial uma vez em Configurações, com 18 rodadas consecutivas. O período é salvo em arena_meta no D1. Sem período configurado, a geração de mensagens fica bloqueada. A aba WhatsApp lista somente as rodadas do período e sugere a última com pontos. O servidor usa o período salvo, não parâmetros enviados pelo cliente. Alterações não modificam pontos, classificação geral ou calendário dos duelos. Sem migração.
+
+### v0.8.8 — Correção do turno para 19 rodadas
+O período usa 19 rodadas consecutivas: 1–19 ou 20–38, por exemplo. A rodada inicial pode ser de 1 a 20. O início salvo é preservado se válido; configurações antigas com início 21 exigem nova escolha. Pontos existentes não são alterados. Os relatórios só consideram apuração completa após as 19 rodadas.

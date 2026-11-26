@@ -6,17 +6,18 @@ export async function readTurn(db){
  const row=await db.prepare("SELECT value FROM arena_meta WHERE key='beta-turn-start'").first();
  if(!row)return {start:null,end:null,latestRound:null};
  const start=Number(row.value);if(!Number.isInteger(start)||start<1||start>21)fail(503,'Configuração de turno inválida.');
- const end=start+17,latest=await db.prepare("SELECT MAX(s.round) AS latest FROM beta_scores s JOIN beta_members m ON m.id=s.member_id WHERE m.status='approved' AND s.round BETWEEN ? AND ?").bind(start,end).first();
+ if(start===21)return {start:null,end:null,latestRound:null}; // Período antigo de 18 rodadas: exige escolha válida, sem alterar dados.
+ const end=start+18,latest=await db.prepare("SELECT MAX(s.round) AS latest FROM beta_scores s JOIN beta_members m ON m.id=s.member_id WHERE m.status='approved' AND s.round BETWEEN ? AND ?").bind(start,end).first();
  return {start,end,latestRound:latest?.latest??null};
 }
 export async function saveTurn(db,start){
- if(!Number.isInteger(start)||start<1||start>21)fail(400,'Escolha uma rodada inicial entre 1 e 21.');
+ if(!Number.isInteger(start)||start<1||start>20)fail(400,'Escolha uma rodada inicial entre 1 e 20.');
  await db.prepare("INSERT INTO arena_meta(key,value) VALUES ('beta-turn-start',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(start)).run();
  return readTurn(db);
 }
 export function reportInput(q,start){
- const round=Number(q.get('round')),end=start+17;
- if(!Number.isInteger(start)||start<1||end>38||!Number.isInteger(round)||round<start||round>end)fail(400,'Informe o início do turno e uma rodada dentro das 18 rodadas.');
+ const round=Number(q.get('round')),end=start+18;
+ if(!Number.isInteger(start)||start<1||end>38||!Number.isInteger(round)||round<start||round>end)fail(400,'Informe o início do turno e uma rodada dentro das 19 rodadas.');
  const a=q.get('a')||'',b=q.get('b')||'',leg=q.get('leg')||'ida';
  if((a||b)&&(!/^[1-9]\d{0,19}$/.test(a)||!/^[1-9]\d{0,19}$/.test(b)||a===b||!['ida','volta'].includes(leg)))fail(400,'Informe dois IDs diferentes e ida ou volta.');
  return {start,end,round,a,b,leg};
@@ -30,7 +31,7 @@ export async function shareReports(db,q){
  db.prepare("SELECT m.team_name AS name,COUNT(s.round) AS played,COALESCE(SUM(s.points),0) AS total FROM beta_members m LEFT JOIN beta_scores s ON s.member_id=m.id AND s.round BETWEEN ? AND ? WHERE m.status='approved' GROUP BY m.id,m.team_name ORDER BY CASE WHEN COUNT(s.round)>0 THEN 0 ELSE 1 END,total DESC,m.team_name,m.id").bind(start,round),
  db.prepare("SELECT COUNT(*) AS scored FROM beta_scores s JOIN beta_members m ON m.id=s.member_id WHERE m.status='approved' AND s.round=?").bind(round)
  ]);
- const teams=ts.results,complete=teams.length>0&&round===end&&teams.every(t=>t.played===18),covered=coverage.results[0].scored,rows=rs.results;
+ const teams=ts.results,complete=teams.length>0&&round===end&&teams.every(t=>t.played===19),covered=coverage.results[0].scored,rows=rs.results;
  const window='Rodadas '+start+' a '+end+' · apuração até '+round;
  const mito='👑 *MITO DO TURNO*\n'+window+'\n'+(complete?'Apuração completa':'Provisório')+'\n\n'+(best.results.length?best.results.map(t=>'🏆 '+name(t.name)+' — '+pts(t.points)+' (rodada '+t.round+')').join('\n'):'Nenhuma pontuação registrada.')+sign;
  let pos=0,prev=null;const medal=['🥇','🥈','🥉'];

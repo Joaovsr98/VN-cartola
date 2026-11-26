@@ -52,8 +52,8 @@ const turnForm=$('#betaTurnForm'),shareForm=$('#betaShareForm');
 function renderTurn(d){
  turnConfig=d;const configured=d.start!==null;
  turnForm.elements.start.value=configured?d.start:'';
- $('#betaTurnPreview').textContent=configured?'Rodadas '+d.start+' a '+d.end+' (18 rodadas).':'Informe a rodada inicial.';
- $('#betaShareTurn').textContent=configured?'Turno: rodadas '+d.start+' a '+d.end+' · 18 rodadas':'Nenhum período configurado. Defina o turno uma vez.';
+ $('#betaTurnPreview').textContent=configured?'Rodadas '+d.start+' a '+d.end+' (19 rodadas).':'Informe a rodada inicial.';
+ $('#betaShareTurn').textContent=configured?'Turno: rodadas '+d.start+' a '+d.end+' · 19 rodadas':'Nenhum período configurado. Defina o turno uma vez.';
  $('#betaGoSettings').textContent=configured?'Alterar período':'Configurar período';
  shareForm.hidden=!configured;
  const select=shareForm.elements.round,previous=Number(select.value);select.replaceChildren();
@@ -65,7 +65,7 @@ async function loadTurn(){
  catch(e){if(seq===turnSequence){$('#betaShareTurn').textContent=e.message;$('#betaTurnStatus').textContent=e.message;}throw e;}
 }
 $('#betaGoSettings').onclick=run(async()=>{showAdmin('settings');await loadTurn();});
-turnForm.oninput=()=>{const start=Number(turnForm.elements.start.value);$('#betaTurnPreview').textContent=Number.isInteger(start)&&start>=1&&start<=21?'Rodadas '+start+' a '+(start+17)+' (18 rodadas).':'Informe uma rodada entre 1 e 21.';};
+turnForm.oninput=()=>{const start=Number(turnForm.elements.start.value);$('#betaTurnPreview').textContent=Number.isInteger(start)&&start>=1&&start<=20?'Rodadas '+start+' a '+(start+18)+' (19 rodadas).':'Informe uma rodada entre 1 e 20.';};
 turnForm.onsubmit=run(async e=>{const start=Number(turnForm.elements.start.value),notice=$('#betaTurnStatus'),button=turnForm.querySelector('button[type=submit]');if(turnConfig?.start!==null&&turnConfig?.start!==undefined&&turnConfig.start!==start&&!confirm('Alterar o período dos relatórios? Os pontos registrados serão mantidos.'))return;button.disabled=true;try{const seq=++turnSequence,d=await api('admin/turn',{start},true);if(seq!==turnSequence||!adminActive)return;shareSequence++;$('#betaShareMessages').replaceChildren();$('#betaShareStatus').textContent='';renderTurn(d);notice.textContent='Período salvo. Abra a aba WhatsApp para gerar os textos.';}catch(err){notice.textContent=err.message;}finally{button.disabled=false;}});
 
 $('#betaShareForm').oninput=()=>{shareSequence++;$('#betaShareMessages').replaceChildren();$('#betaShareStatus').textContent='Gere novamente após alterar os filtros.';};
