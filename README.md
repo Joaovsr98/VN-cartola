@@ -72,3 +72,6 @@ Migração 0002_beta.sql cria tabelas isoladas, sem misturar participantes e pon
 
 ### Conectar homologação D1
 O arquivo `wrangler.homologacao.jsonc` aponta exclusivamente para o novo banco informado e para um Worker separado `vn-arena-homologacao`. O `wrangler.jsonc` padrão do Worker público permanece intacto. Em checkout da branch `bloco09-d1-integrado`, autenticado no Cloudflare, rode `npx wrangler d1 migrations apply DB --remote --config wrangler.homologacao.jsonc` e somente depois `npx wrangler deploy --config wrangler.homologacao.jsonc`. Confira `/api/health` (storage=d1) e `/api/beta/status` (enabled=false). Não habilite BETA_ENABLED nem cadastre participantes reais nesta etapa. Não guardar secrets no GitHub; nenhum token administrativo foi configurado.
+
+### Identidade visual
+Homologação clara em cinza, branco, preto e dourado; gramado e uniformes ilustrativos preservados.
