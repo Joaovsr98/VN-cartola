@@ -78,3 +78,16 @@ test('beta: convite de grupo reutilizável, sem vencimento, com exclusão isolad
  assert.equal((await register('104')).status,409);
  assert.equal(db.prepare('SELECT COUNT(*) n FROM beta_members').get().n,2);
 });
+
+test('beta: admin session persists, expires, revokes on logout and secret rotation',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';
+ const post=(data,extra={})=>({method:'POST',headers:{'Content-Type':'application/json',Origin:'https://arena.test',...extra},body:JSON.stringify(data)});
+ assert.equal((await call('/api/beta/admin/login',post({}))).status,401);
+ const login=async()=>{const r=await call('/api/beta/admin/login',post({},{Authorization:'Bearer '+env.ADMIN_API_TOKEN}));assert.equal(r.status,200);assert.match(r.headers.get('Set-Cookie'),/__Host-arena_admin=.*HttpOnly; SameSite=Strict; Max-Age=28800/);return {Cookie:r.headers.get('Set-Cookie').split(';')[0]};};
+ const session=await login();assert.equal((await call('/api/beta/admin/members',{headers:session})).status,200);
+ const group=await(await call('/api/beta/admin/invites',post({mode:'group'},session))).json();assert.ok(group.invite);
+ const reg=await(await call('/api/beta/register',post({invite:group.invite,teamName:'Time confirmação',externalId:'101',consent:true}))).json();assert.equal(reg.teamName,'Time confirmação');assert.equal(reg.status,'pending');assert.match(reg.message,/Inscrição recebida/);
+ assert.equal((await call('/api/beta/admin/logout',post({},session))).status,200);assert.equal((await call('/api/beta/admin/members',{headers:session})).status,401);
+ const expired=await login();db.exec("UPDATE arena_meta SET value='0' WHERE key LIKE 'beta-admin-session:%'");assert.equal((await call('/api/beta/admin/members',{headers:expired})).status,401);
+ const rotated=await login();env.ADMIN_API_TOKEN+='rotated';assert.equal((await call('/api/beta/admin/members',{headers:rotated})).status,401);
+});

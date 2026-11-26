@@ -32,3 +32,5 @@ dialog{width:min(92vw,540px);max-height:85vh;overflow:auto;border:1px solid var(
 #beta form{margin:16px 0;padding:12px;border:1px solid var(--border);border-radius:10px}#beta label input[type=checkbox]{width:auto;margin-right:7px}#beta details{margin-top:18px}#beta summary{cursor:pointer}#betaKeyValue,#betaInviteValue{width:100%;overflow-wrap:anywhere}#betaStatus{color:#785b14}
 
 .brand,input,select,textarea{color:#20242c}.pitch-player strong{color:#fff}.pitch-player b{color:#f3d994}.captain-shirt{background:#d4af37;color:#17191e;outline-color:#d4af37}.mobile-nav button.active{color:#785b14}.rank-actions button[aria-pressed="true"]{background:#785b14;color:#fff}button.active,form button{color:#fff}button[aria-pressed="true"]{color:#785b14}.crest{color:#fff}#beta form button{color:#fff}
+
+.beta-confirmation{padding:14px;border:1px solid #c9ad67;border-radius:10px;background:#fffaf0;color:#63490c;margin:12px 0}.beta-confirmation p{margin:6px 0;color:#63490c}#betaAdminSummary{font-weight:600}

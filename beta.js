@@ -9,6 +9,18 @@ const now=()=>Math.floor(Date.now()/1000);
 const GROUP_EXPIRY=253402300799;
 const cookie=(value,maxAge)=>'__Host-arena_beta='+value+'; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age='+maxAge;
 const sessionToken=req=>req.headers.get('Cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith('__Host-arena_beta='))?.slice('__Host-arena_beta='.length);
+const ADMIN_TTL=8*3600;
+const ADMIN_PREFIX='beta-admin-session:';
+const adminCookie=(value,age)=>'__Host-arena_admin='+value+'; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age='+age;
+const adminSession=req=>req.headers.get('Cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith('__Host-arena_admin='))?.slice('__Host-arena_admin='.length);
+// Keyed digest binds sessions to the current administrative secret, so rotation invalidates them.
+async function adminSessionKey(key,secret){return ADMIN_PREFIX+await hash(secret+':'+key);}
+async function requireAdmin(req,env){
+ if(req.headers.has('Authorization'))return authorizeAdmin(req,env.ADMIN_API_TOKEN);
+ const key=adminSession(req);if(!validToken(key))fail(401,'Entre na administração.');
+ const row=await env.DB.prepare('SELECT value FROM arena_meta WHERE key=?').bind(await adminSessionKey(key,env.ADMIN_API_TOKEN)).first();
+ if(!row||Number(row.value)<=now())fail(401,'Sessão administrativa expirada. Entre novamente.');
+}
 export async function betaReady(env){if(!env.DB||env.BETA_ENABLED!=='true'||typeof env.ADMIN_API_TOKEN!=='string'||env.ADMIN_API_TOKEN.length<32||env.ADMIN_API_TOKEN.length>256)return false;const row=await env.DB.prepare("SELECT value FROM arena_meta WHERE key='beta'").first();return row?.value==='1';}
 async function member(db,req){
  const key=sessionToken(req);if(!validToken(key))fail(401,'Entre com sua chave de acesso.');
@@ -24,7 +36,21 @@ export async function betaRoute(req,env,path,readInput,json){
  const db=env.DB,method=req.method;
  if(method==='POST'&&(req.headers.get('Origin')!==new URL(req.url).origin||req.headers.get('Sec-Fetch-Site')==='cross-site'))fail(403,'Origem inválida');
  if(path.startsWith('/api/beta/admin/')){
-  await authorizeAdmin(req,env.ADMIN_API_TOKEN);
+  if(path==='/api/beta/admin/login'&&method==='POST'){
+   await authorizeAdmin(req,env.ADMIN_API_TOKEN);
+   const key=token(),expires=now()+ADMIN_TTL;
+   await db.batch([
+    db.prepare("DELETE FROM arena_meta WHERE key LIKE 'beta-admin-session:%' AND CAST(value AS INTEGER)<=?").bind(now()),
+    db.prepare('INSERT INTO arena_meta(key,value) VALUES (?,?)').bind(await adminSessionKey(key,env.ADMIN_API_TOKEN),String(expires))
+   ]);
+   return reply({ok:true,expiresAt:expires},200,adminCookie(key,ADMIN_TTL));
+  }
+  if(path==='/api/beta/admin/logout'&&method==='POST'){
+   const key=adminSession(req);
+   if(validToken(key))await db.prepare('DELETE FROM arena_meta WHERE key=?').bind(await adminSessionKey(key,env.ADMIN_API_TOKEN)).run();
+   return reply({ok:true},200,adminCookie('',0));
+  }
+  await requireAdmin(req,env);
   if(path==='/api/beta/admin/invites'&&method==='POST'){
    const d=await readInput(req);if(d.mode!==undefined&&!['group','individual'].includes(d.mode))fail(400,'Tipo de convite inválido.');
    const group=d.mode==='group',key=token(),time=now(),expiry=group?GROUP_EXPIRY:time+7*86400;
@@ -76,7 +102,7 @@ export async function betaRoute(req,env,path,readInput,json){
   }
   if(result.meta.changes!==1)fail(409,'Convite inválido, utilizado, revogado ou time já inscrito.');
   // Return access key independently of session creation, so no account is stranded on session failure.
-  return reply({accessKey:access,status:'pending',message:'Guarde a chave. Entre com ela para acompanhar a aprovação.'},201);
+  return reply({accessKey:access,status:'pending',teamName:name,message:'Inscrição recebida! Aguarde a aprovação do administrador. Guarde sua chave de acesso.'},201);
  }
  if(path==='/api/beta/login'&&method==='POST'){
   const d=await readInput(req);if(!validToken(d.accessKey))fail(401,'Chave inválida.');
