@@ -31,3 +31,38 @@ docker compose ps
 Abra http://localhost:3000 (ou altere ARENA_PORT). Os dados SQLite persistem no volume arena_data. Para parar, use docker compose down; não utilize down -v se quiser preservar dados. O container é executado sem root, sem capabilities extras, com sistema de arquivos somente leitura e volume de dados gravável. O acesso é local (loopback), sem TLS, exclusivamente para testes. A CI executa testes dentro do Docker e verifica persistência ao recriar o container.
 
 Cloudflare: o backend atual usa Node HTTP e SQLite nativo. Não publique diretamente como Worker ou Pages até adaptar runtime, autenticação e persistência. Docker local não equivale a Cloudflare Containers. Nenhum plano pago, deploy ou banco remoto foi criado neste bloco. Dados fictícios e pagamentos desativados.
+
+## Bloco 07 — Cloudflare Workers (prévia pública)
+Worker independente, sem banco e sem autenticação, usando dados sintéticos. Inclui ranking, rodadas, mata-mata, estatísticas e simulador que não grava dados. Cadastro, login, painel admin, importações e pagamentos estão bloqueados no Worker. A versão completa local continua disponível pelo Docker. A suíte local valida a interface Fetch do Worker com binding de assets simulado; ainda não equivale a execução no runtime Cloudflare.
+
+Em Workers & Pages, importe o repositório VN-cartola, escolha a branch bloco07-cloudflare-preview, nome vn-arena, diretório raiz, comando de build npm test e comando de deploy npx wrangler deploy. Não selecione Containers/Workers Paid. O arquivo wrangler.jsonc define assets e entrypoint. A conta deve permanecer no Free. Confira o endereço workers.dev antes de adicionar um domínio personalizado. Não há deploy realizado pelo GitHub neste bloco; a conta Cloudflare precisa ser operada pelo titular. Banco remoto e autenticação continuam pendentes; D1 ou PostgreSQL serão avaliados separadamente.
+
+### Correção 0.6.1 — Cloudflare
+O nome em wrangler.jsonc deve coincidir com o Worker criado: vn-cartola. Configure a branch de produção como bloco07-cloudflare-preview, diretório raiz do repositório, build npm test e deploy npx wrangler deploy. O endpoint /api/health deve retornar JSON com version 0.6.1, mode demo e payments false. A interface mostra a versão no rodapé. Se houver HTML no lugar de JSON, confira se foi implantado o Worker e não somente os assets estáticos. O domínio publicado ainda precisa ser validado. Não contém banco remoto, pagamentos ou dados reais.
+
+### v0.6.2 — Ranking detalhado (prévia)
+Pesquisa por time/cartoleiro, ordenação por total acumulado até a rodada selecionada ou pontos da rodada, evolução da posição, patrimônio e variação simulados, capitão, diferença para o líder, escudos tipográficos próprios e escalações fictícias (11 titulares + 5 reservas). A soma dos pontos individuais demonstrativos corresponde aos pontos da rodada; não representa a regra oficial de pontuação. Rodadas sem resultados não geram parciais, patrimônio ou escalação. Todos os dados são fictícios. Sem pagamentos e sem API externa. A branch D1 continua separada; este bloco não ativa o banco remoto.
+
+### v0.6.3 — Experiência de competição
+Pódio parcial até a rodada escolhida, campo demonstrativo 4-3-3 ao abrir um time, e mata-mata por fases em colunas navegáveis. O chaveamento segue o motor existente; não são traçadas conexões fixas entre confrontos. O pódio não declara campeão antecipadamente. Dados fictícios, sem pagamentos, sem banco remoto. Testes de pódio e formação foram acrescentados; execução em navegador e deploy dependem de validação.
+
+### v0.6.4 — Navegação mobile e meu time
+Página inicial, menu inferior, seleção de time fictício para visualizar (sem autenticação ou edição), orçamento em cartoletas com custo dos titulares e técnico e saldo, calendário ilustrativo sem datas reais, atalhos para estatísticas e eliminatórias. Preços e clubes são sintéticos. Técnico sem pontuação nesta simulação. Sem dados oficiais, pagamentos ou conexão D1. Testes de orçamento e calendário adicionados.
+
+### v0.6.5 — Mercado demonstrativo
+Mercado de 48 atletas fictícios, quatro formações, 11 titulares e técnico, escolha de capitão, filtro de posição, busca, orçamento de C$145,75, preenchimento automático pelo menor custo e salvamento local de escalação completa. Não inclui reservas no editor, nem sincronização de contas, resultados ou escalações reais. O simulador roda no navegador e não consome consultas adicionais ao Worker. Uniformes genéricos coloridos, sem escudos oficiais. Testes das regras de escalação adicionados.
+
+### v0.6.6 — Central de competições e favoritos
+Favoritos locais por liga, atalhos no início e menu Mais, central de campeonato, mata-mata e mito, regulamento demonstrativo e histórico somente para temporadas completas na base simulada. O término é inferido da presença de todos os resultados, não de homologação oficial; o fechamento administrativo real e armazenamento de temporadas anteriores continuam pendentes. Nenhum prêmio financeiro, cobrança ou notificação push está ativo. O Docker conserva os recursos anteriores; a central usa os dados demonstrativos da prévia Cloudflare. Novos testes de conclusão e dados ausentes.
+
+### v0.6.7 — Ligas, jogos e compartilhamento
+Catálogo de três ligas fictícias (liga piloto com 16, duas ligas com oito times cada), seleção independente e isolamento de participantes. Jogos ilustrativos nas rodadas 32–34, sem calendário ou probabilidades oficiais; placares apenas na rodada passada. Exportação CSV e compartilhamento do ranking por texto no dispositivo. Não permite criação/inscrição real na prévia Cloudflare; administração local preservada. Sem pagamentos e sem banco remoto.
+
+### v0.6.8 — Comparação de times
+Detalhes por rodada, alternância campo/lista, comparação de dois times da mesma liga por posição, destaque de titulares comuns por ID, valorização ilustrativa, pontos com/sem bônus de capitão. A base fictícia foi regenerada com atletas estáveis, pontuação base comum e bônus demonstrativo de 50%; totais e patrimônio fictícios podem mudar em relação às versões anteriores. Não representa scouts ou regras oficiais do Cartola; técnico e reservas não pontuam nesta simulação. Sem integração externa, banco remoto ou pagamentos.
+
+### v0.6.9 — Adversários da liga
+Comparação em lote de todos os outros times da liga na rodada selecionada, ordenada por titulares em comum e pontuação. Uma consulta retorna os resumos; seleção abre o comparativo individual. Cache somente durante a visualização atual, sem atualização automática. Rodadas sem dados não geram resultados. Dados fictícios, sem cobranças, integração real ou D1 ativo.
+
+### Identidade visual
+Produção escura em cinza, branco, preto e dourado; verde/vermelho somente para indicadores esportivos, gramado e uniformes ilustrativos preservados.
