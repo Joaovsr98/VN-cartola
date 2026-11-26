@@ -103,7 +103,7 @@ function renderGames(root,fixtures){
  for(const f of fixtures){const card=el('article',undefined,'fixture');card.append(el('small','RODADA '+f.round+' · SIMULAÇÃO'));const row=el('div',undefined,'fixture-teams');row.append(el('strong',f.home),el('span','×'),el('strong',f.away));card.append(row,el('small','Data e horário não definidos'));root.append(card);}
 }
 function renderHome(d){
- dashboard=d;$('#homeRound').textContent=d.latestDemoRound?'Rodada '+d.latestDemoRound+' · demonstração':'Temporada '+d.league.season;
+ dashboard=d;document.querySelectorAll('.local-only').forEach(b=>b.hidden=d.source?.mode!=='manual'||!document.querySelector('nav button[data-tab="'+b.dataset.go+'"]'));$('#homeRound').textContent=d.latestDemoRound?'Rodada '+d.latestDemoRound+' · demonstração':'Temporada '+d.league.season;
  const box=$('#homeSummary');box.replaceChildren();
  for(const [label,value] of [['Times aprovados',String(d.approved)],['Líder',d.richRank?.[0]?.name||d.rank[0]?.name||'—'],['Maior pontuação',fmt(d.best?.best)]]){const item=el('div');item.append(el('small',label),el('strong',value));box.append(item);}
  renderGames($('#homeGames'),d.fixtures?.slice(0,2));renderGames($('#gameList'),d.fixtures);
