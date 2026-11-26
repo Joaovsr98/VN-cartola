@@ -126,3 +126,6 @@ Defina a rodada inicial uma vez em Configurações, com 18 rodadas consecutivas.
 
 ### v0.8.8 — Correção do turno para 19 rodadas
 O período usa 19 rodadas consecutivas: 1–19 ou 20–38, por exemplo. A rodada inicial pode ser de 1 a 20. O início salvo é preservado se válido; configurações antigas com início 21 exigem nova escolha. Pontos existentes não são alterados. Os relatórios só consideram apuração completa após as 19 rodadas.
+
+### v0.8.9 — Sincronização programada do piloto 2026
+Cron em homologação a cada minuto, sem chamadas externas enquanto CARTOLA_READ_AUTHORIZED e CARTOLA_AUTOSYNC_ENABLED não estiverem ambos habilitados após autorização e validação da fonte. Lotes de até oito times; parciais rotativas isoladas no D1, sem substituir resultados, com expiração visual e sem regras de reserva. Mercado 2026 precisa estar confirmado. Quando o mercado reabre, tenta a rodada anterior e só grava pontuação se a resposta do time confirmar ID, rodada e temporada 2026; não sobrescreve registros existentes. Sem essa confirmação, não grava. A última rodada exige game_over. Não é importação histórica completa. Consultas reais de times e parciais ainda não validadas. Sem migração. Desabilitar cron/flags se não houver autorização ou se a fonte bloquear acesso.

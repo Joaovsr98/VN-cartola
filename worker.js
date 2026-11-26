@@ -5,7 +5,8 @@ import {competition} from './competition.js';
 import {checkDb,readLeagues,readLeague,authorizeAdmin,writeScore} from './d1.js';
 import {betaRoute} from './beta.js';
 import {adminPage} from './admin-page.js';
-const VERSION='0.8.8';
+import {syncRound} from './cartola-sync.js';
+const VERSION='0.8.9';
 const pilot={id:1,name:'Pernas de Pau • Liga piloto',season:2027,start_round:20,end_round:38,knockout_start:30,knockout_size:16};
 const allTeams=['Atlético Aurora','Furacão FC','Vila United','Estrela FC','Real Zona Sul','Tricolor 27','Bola na Rede','Canarinho FC','Arena City','Alvorada','União FC','Guerreiros','Império FC','Fênix','Nova Geração','Raça FC'].map((name,i)=>({id:i+1,name,status:'approved'}));
 const allScores=allTeams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:demoTotal(id,round)};}));
@@ -96,4 +97,4 @@ async function readInput(req){
  let data;try{data=JSON.parse(new TextDecoder().decode(bytes));}catch{fail(400,'JSON inválido');}
  if(!data||typeof data!=='object'||Array.isArray(data))fail(400,'JSON inválido');return data;
 }
-export default {async fetch(req,env){try{return await handle(req,env);}catch(e){return json({error:e.status?e.message:'Serviço de dados temporariamente indisponível'},e.status||503);}}};
+export default {async scheduled(controller,env,ctx){ctx.waitUntil(syncRound(env));},async fetch(req,env){try{return await handle(req,env);}catch(e){return json({error:e.status?e.message:'Serviço de dados temporariamente indisponível'},e.status||503);}}};

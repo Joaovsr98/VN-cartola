@@ -1,4 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {DatabaseSync} from 'node:sqlite';import {readFileSync} from 'node:fs';import worker from '../worker.js';import {demoTotal} from '../demo-ranking.js';
+import {syncRound,liveRanking} from '../cartola-sync.js';
 function setup(t){
  const db=new DatabaseSync(':memory:');t.after(()=>db.close());db.exec('PRAGMA foreign_keys=ON');db.exec(readFileSync(new URL('../migrations/0001_homologacao.sql',import.meta.url),'utf8'));
  const bind=(sql,args=[])=>({bind:(...p)=>bind(sql,p),first:async()=>db.prepare(sql).get(...args),all:async()=>({results:db.prepare(sql).all(...args)}),run:()=>({meta:{changes:Number(db.prepare(sql).run(...args).changes)}}),sql,args});
@@ -223,4 +224,26 @@ test('beta: turno de 19 rodadas, configuração antiga e apuração completa som
  const previous=await(await call('/api/beta/admin/share?round=37',{headers})).json();assert.equal(previous.complete,false);assert.match(previous.messages.top,/provisória/);
  const final=await(await call('/api/beta/admin/share?round=38',{headers})).json();assert.equal(final.complete,true);assert.match(final.messages.top,/190,00/);
  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,19);
+});
+
+test('beta: agendamento autorizado, parcial isolada e resultado final com temporada confirmada',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';
+ const headers={Authorization:'Bearer '+env.ADMIN_API_TOKEN,Origin:'https://arena.test','Content-Type':'application/json'};
+ const post=data=>({method:'POST',headers,body:JSON.stringify(data)});
+ assert.equal((await call('/api/beta/admin/manual',post({authorized:true,teams:[{externalId:'123',teamName:'Time A'}]}))).status,201);
+ let requests=0;const source={market:async()=>{requests++;return {season:2026,round:37,status:2};},athletes:async()=>({round:37,points:{'1':1000}}),lineup:async({externalId,round})=>({externalId,round,teamName:'Time A',captainId:'1',starters:[{id:'1',position:5,name:'Atleta'}]})};
+ assert.equal((await syncRound(env,source,100)).state,'disabled');assert.equal(requests,0);
+ env.CARTOLA_READ_AUTHORIZED='true';env.CARTOLA_AUTOSYNC_ENABLED='true';
+ assert.equal((await syncRound(env,source,100)).updated,1);assert.equal((await syncRound(env,source,101)).state,'busy');
+ const m=db.prepare('SELECT id FROM beta_members').get();
+ const live=await liveRanking(env,m.id,102);assert.equal(live.rows[0].estimate,15);assert.equal(live.rows[0].mine,true);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,0);
+ assert.equal((await liveRanking(env,m.id,400)).rows.length,0);
+ source.market=async()=>({season:2027,round:38,status:1});assert.equal((await syncRound(env,source,160)).state,'season-unverified');
+ source.market=async()=>({season:2026,round:38,status:1});source.team=async({externalId,round})=>({externalId,round,points:90,season:null});
+ assert.equal((await syncRound(env,source,220)).failed,1);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,0);
+ source.team=async({externalId,round})=>({externalId,round,points:90,season:2026});assert.equal((await syncRound(env,source,280)).updated,1);
+ assert.equal(db.prepare('SELECT points FROM beta_scores WHERE round=37').get().points,9000);
+ assert.equal((await syncRound(env,source,340)).state,'up-to-date');
+ assert.equal((await call('/api/beta/admin/sync/status')).status,401);
+ assert.equal((await call('/api/beta/live')).status,401);
 });

@@ -1,5 +1,5 @@
 // Experimental read-only adapter. Enable only with explicit authorization from the data provider.
-// No login, user cookies, automatic polling, or writes to the external service.
+// No login, user cookies or writes to the external service. Scheduled reads require explicit authorization.
 const fail=(status,message)=>{throw Object.assign(Error(message),{status});};
 const ID=/^[1-9]\d{0,15}$/;
 export const cartolaEnabled=env=>env.CARTOLA_READ_AUTHORIZED==='true';
@@ -30,7 +30,8 @@ export async function readCartolaSearch(query,fetcher=fetch){
 export async function readCartolaMarket(fetcher=fetch){
  const d=await getJson('/mercado/status',fetcher),round=d?.rodada_atual,status=d?.status_mercado;
  if(!Number.isInteger(round)||round<1||round>38||!Number.isInteger(status))fail(502,'Status de mercado não reconhecido.');
- return {round,status,source:'external-preview',verifiedSeason:false};
+ const season=Number.isInteger(d.temporada)?d.temporada:null;
+ return {round,status,season,gameOver:d.game_over===true,source:'external-preview',verifiedSeason:season!==null};
 }
 export async function readCartolaTeam({externalId,round},fetcher=fetch){
  requireId(externalId);requireRound(round);
@@ -38,7 +39,8 @@ export async function readCartolaTeam({externalId,round},fetcher=fetch){
  const team=data?.time,name=safeName(team?.nome),reportedRound=data?.rodada_atual??data?.rodada;
  if(safeId(team?.time_id)!==externalId||!name||reportedRound!==round)fail(502,'Não foi possível confirmar o time e a rodada da resposta externa.');
  const points=data?.pontos;if(typeof points!=='number'||!Number.isFinite(points)||points< -1000||points>1000)fail(502,'Pontuação não disponível ou inválida.');
- return {externalId,teamName:name,round,points:Math.round(points*100)/100,source:'external-preview',verifiedSeason:false};
+ const season=Number.isInteger(data.temporada)?data.temporada:null;
+ return {externalId,teamName:name,round,points:Math.round(points*100)/100,season,source:'external-preview',verifiedSeason:season!==null};
 }
 export async function readCartolaLineup({externalId,round},fetcher=fetch){
  requireId(externalId);requireRound(round);
