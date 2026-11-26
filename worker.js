@@ -1,11 +1,11 @@
 import {ranking,bracket} from './core.js';
 import {analytics,simulate} from './analytics.js';
-import {richRanking,lineup} from './demo-ranking.js';
+import {richRanking,lineup,demoTotal,compareTeams} from './demo-ranking.js';
 import {competition} from './competition.js';
-const VERSION='0.6.7';
+const VERSION='0.6.8';
 const pilot={id:1,name:'Pernas de Pau • Liga piloto',season:2027,start_round:20,end_round:38,knockout_start:30,knockout_size:16};
 const allTeams=['Atlético Aurora','Furacão FC','Vila United','Estrela FC','Real Zona Sul','Tricolor 27','Bola na Rede','Canarinho FC','Arena City','Alvorada','União FC','Guerreiros','Império FC','Fênix','Nova Geração','Raça FC'].map((name,i)=>({id:i+1,name,status:'approved'}));
-const allScores=allTeams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:4200+((i*1379+round*719+i*round*53)%6900)};}));
+const allScores=allTeams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:demoTotal(id,round)};}));
 const catalog=[{...pilot,description:'Segundo turno e mata-mata',visibility:'demo',teamCount:16},{...pilot,id:11,name:'Copa Arena',description:'Copa demonstrativa de oito times',knockout_size:8,teamCount:8,visibility:'demo'},{...pilot,id:12,name:'Liga dos Amigos',description:'Campeonato demonstrativo de oito times',knockout_size:8,teamCount:8,visibility:'demo'}];
 const fixtures=[
  {home:'Aurora',away:'Vila',round:33,valid:true},{home:'Estrela',away:'União',round:33,valid:false},{home:'Fênix',away:'Alvorada',round:33,valid:true},
@@ -33,6 +33,13 @@ export default {async fetch(req,env){
  const scores=allScores.filter(s=>ids.has(s.teamId));
  if(req.method==='GET'&&p==='/api/leagues')return json({leagues:catalog});
  if(req.method==='GET'&&p==='/api/analytics')return json(analytics(league,teams,scores));
+ if(req.method==='GET'&&p==='/api/compare'){
+  const a=Number(url.searchParams.get('a')),b=Number(url.searchParams.get('b')),round=Number(url.searchParams.get('round')||32);
+  if(!Number.isInteger(round)||round<20||round>38||a===b)return json({error:'Comparação inválida'},400);
+  const left=teams.find(t=>t.id===a),right=teams.find(t=>t.id===b);if(!left||!right)return json({error:'Time não encontrado nesta liga'},404);
+  const profile=t=>lineup(t,round,scores.find(s=>s.teamId===t.id&&s.round===round)?.points??null);
+  return json({round,left:{id:left.id,name:left.name},right:{id:right.id,name:right.name},comparison:compareTeams(profile(left),profile(right)),source:'demo'});
+ }
  if(req.method==='GET'&&p==='/api/team'){
   const id=Number(url.searchParams.get('id')),round=Number(url.searchParams.get('round')||32);
   if(!Number.isInteger(round)||round<20||round>38)return json({error:'Rodada inválida'},400);

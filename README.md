@@ -57,3 +57,6 @@ Favoritos locais por liga, atalhos no início e menu Mais, central de campeonato
 
 ### v0.6.7 — Ligas, jogos e compartilhamento
 Catálogo de três ligas fictícias (liga piloto com 16, duas ligas com oito times cada), seleção independente e isolamento de participantes. Jogos ilustrativos nas rodadas 32–34, sem calendário ou probabilidades oficiais; placares apenas na rodada passada. Exportação CSV e compartilhamento do ranking por texto no dispositivo. Não permite criação/inscrição real na prévia Cloudflare; administração local preservada. Sem pagamentos e sem banco remoto.
+
+### v0.6.8 — Comparação de times
+Detalhes por rodada, alternância campo/lista, comparação de dois times da mesma liga por posição, destaque de titulares comuns por ID, valorização ilustrativa, pontos com/sem bônus de capitão. A base fictícia foi regenerada com atletas estáveis, pontuação base comum e bônus demonstrativo de 50%; totais e patrimônio fictícios podem mudar em relação às versões anteriores. Não representa scouts ou regras oficiais do Cartola; técnico e reservas não pontuam nesta simulação. Sem integração externa, banco remoto ou pagamentos.

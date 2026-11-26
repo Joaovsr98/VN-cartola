@@ -61,18 +61,33 @@ function drawRich(){
   row.append(pos,crest,info,partial,total);row.onclick=()=>openTeam(t);root.append(row);
  }if(!list.length)root.append(el('p','Nenhum participante encontrado.'));
 }
-async function openTeam(t){
- const request=++detailRequest;activeFavoriteTeam=t.id;updateFavoriteButtons();$('#teamTitle').textContent=t.name;$('#teamSubtitle').textContent='Carregando escalação demonstrativa…';$('#teamPlayers').replaceChildren();$('#pitch').replaceChildren();$('#pitchSection').hidden=true;$('#teamBudget').hidden=true;$('#coachInfo').hidden=true;
+let detailTeam=null,detailRound=32,detailMode='field',compareRequest=0,detailLineup=null;
+function detailView(mode){detailMode=mode;$('#pitchSection').hidden=mode!=='field'||!detailLineup;$('#teamPlayers').hidden=mode!=='list'||!detailLineup;$('#comparePanel').hidden=mode!=='compare';for(const [id,key] of [['#showField','field'],['#showList','list'],['#showCompare','compare']]){$(id).classList.toggle('active',mode===key);$(id).setAttribute('aria-pressed',String(mode===key));}if(mode==='compare')loadComparison();}
+function openTeam(t){detailTeam=t;detailRound=Number(rankRound.value)||32;detailMode='field';return loadTeam();}
+async function loadTeam(){
+ const t=detailTeam;if(!t)return;const request=++detailRequest;++compareRequest;detailLineup=null;activeFavoriteTeam=t.id;updateFavoriteButtons();$('#teamTitle').textContent=t.name;$('#detailRound').textContent='Rodada '+detailRound;$('#detailPrev').disabled=detailRound<=20;$('#detailNext').disabled=detailRound>=38;$('#teamSubtitle').textContent='Carregando escalação demonstrativa…';
+ for(const id of ['#teamPlayers','#pitch','#detailMetrics','#compareResult'])$(id).replaceChildren();
+ for(const id of ['#pitchSection','#teamBudget','#coachInfo','#detailMetrics','#detailView','#comparePanel','#teamPlayers'])$(id).hidden=true;
  if(!teamDialog.open)teamDialog.showModal();
- try{const d=await api('team?id='+t.id+'&round='+rankRound.value);if(request!==detailRequest||!teamDialog.open)return;
+ try{const d=await api('team?id='+t.id+'&round='+detailRound);if(request!==detailRequest||!teamDialog.open)return;
  $('#teamSubtitle').textContent='Rodada '+d.round+' · Dados fictícios'+(d.lineup?' · '+fmt(d.lineup.points)+' pontos':' · Sem pontuação registrada');
- if(!d.lineup)return;
- renderPitch(d.lineup);renderBudget(d.lineup);
- for(const starter of [true,false]){$('#teamPlayers').append(el('h3',starter?'Titulares':'Reservas'));for(const p of d.lineup.players.filter(p=>p.starter===starter)){const row=el('div',undefined,'playerrow'),name=el('div',p.name+(p.captain?' · C':''));name.append(el('small',p.position+' · '+p.club+(p.price==null?'':' · C$ '+fmt(p.price))));row.append(name,el('strong',fmt(p.points)));$('#teamPlayers').append(row);}}
+ if(!d.lineup)return;detailLineup=d.lineup;$('#detailView').hidden=false;renderPitch(d.lineup);renderBudget(d.lineup);
+ const metrics=$('#detailMetrics');metrics.hidden=false;for(const [label,value] of [['Titulares com pontos',d.lineup.players.filter(p=>p.starter&&p.points!=null).length+'/11'],['Com capitão',fmt(d.lineup.points)],['Sem bônus de capitão',fmt(d.lineup.withoutCaptain)]]){const box=el('div');box.append(el('small',label),el('strong',value));metrics.append(box);}
+ for(const starter of [true,false]){$('#teamPlayers').append(el('h3',starter?'Titulares':'Reservas'));for(const p of d.lineup.players.filter(p=>p.starter===starter)){const row=el('div',undefined,'playerrow'),name=el('div',p.name+(p.captain?' · C':''));name.append(el('small',p.position+' · '+p.club+(p.price==null?'':' · C$ '+fmt(p.price))));const points=el('div',undefined,'ranknums');points.append(el('strong',fmt(p.points)),el('small',p.valuation==null?'—':signed(p.valuation),p.valuation>0?'gain':p.valuation<0?'loss':''));row.append(name,points);$('#teamPlayers').append(row);}}
+ const select=$('#compareTeam'),previous=select.value;select.replaceChildren();for(const other of (richData||[]).filter(x=>x.id!==t.id)){const o=el('option',other.name);o.value=other.id;select.append(o);}if([...select.options].some(o=>o.value===previous))select.value=previous;$('#showCompare').disabled=!select.options.length;detailView(detailMode);
  }catch(e){if(request===detailRequest)$('#teamSubtitle').textContent=e.message;}
 }
+async function loadComparison(){
+ const target=Number($('#compareTeam').value);if(!target||!detailTeam||!detailLineup)return;const req=++compareRequest,root=$('#compareResult');root.textContent='Comparando…';
+ try{const d=await api('compare?a='+detailTeam.id+'&b='+target+'&round='+detailRound);if(req!==compareRequest||!teamDialog.open||detailMode!=='compare')return;root.replaceChildren();const c=d.comparison;if(!c){root.append(el('p','Sem resultados para comparar.'));return;}
+ const score=el('div',undefined,'compare-score');for(const [name,points] of [[d.left.name,c.leftPoints],[d.right.name,c.rightPoints]]){const cell=el('div');cell.append(el('small',name),el('strong',fmt(points)));score.append(cell);}root.append(score,el('p',c.commonCount+' titulares em comum · Diferença: '+fmt(Math.abs(c.difference))+' pts'),el('small','Dados fictícios · destaque verde: mesmo atleta. C indica capitão.'));
+ for(const group of c.groups){root.append(el('h3',group.position));for(const item of group.rows){const row=el('div',undefined,'compare-row'+(item.common?' common-player':''));for(const p of [item.left,item.right]){const cell=el('div',undefined,'compare-cell');cell.append(el('strong',p?p.name+(p.captain?' · C':''):'—'),el('b',fmt(p?.points)),el('small',p?p.club+' · '+signed(p.valuation):''));row.append(cell);}root.append(row);}}
+ }catch(e){if(req===compareRequest)root.textContent=e.message;}
+}
+$('#showField').onclick=()=>detailView('field');$('#showList').onclick=()=>detailView('list');$('#showCompare').onclick=()=>detailView('compare');$('#compareTeam').onchange=loadComparison;
+$('#detailPrev').onclick=()=>{detailRound=Math.max(20,detailRound-1);loadTeam();};$('#detailNext').onclick=()=>{detailRound=Math.min(38,detailRound+1);loadTeam();};
 rankSearch.oninput=drawRich;rankSort.onchange=drawRich;rankRound.onchange=()=>{$('#roundSelect').value=rankRound.value;refresh().catch(err);};
-$('#closeTeam').onclick=()=>teamDialog.close();teamDialog.addEventListener('close',()=>detailRequest++);
+$('#closeTeam').onclick=()=>teamDialog.close();teamDialog.addEventListener('close',()=>{detailRequest++;compareRequest++;});
 function renderPodium(d){
  const section=$('#podiumSection'),root=$('#podium'),list=d.podium||[];root.replaceChildren();section.hidden=!list.length;
  if(!list.length)return;
