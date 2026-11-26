@@ -102,3 +102,6 @@ Homologação clara preservada. Hero e banner da beta com degradê suave de graf
 
 ### v0.8.0 — Piloto mobile first
 Cabeçalho de ponta a ponta, hero compacto, navegação mobile fixa com acesso direto à liga privada, largura expandida no desktop, painel inicial com cards e jogos lado a lado. A beta não exibe o hero demonstrativo. Convite compartilhável via fragmento de URL, preenchido automaticamente e removido do endereço após leitura; não inclui chave individual. Confirmação de lançamento próxima ao formulário e atualização da inscrição pelo participante. Sem alterações no banco, pagamentos, autenticação definitiva ou integração oficial. Piloto manual: validar cadastro, aprovação, pontuação e ranking em homologação antes de convidar o grupo.
+
+### v0.8.1 — Usabilidade do piloto
+Liga privada abre por padrão quando habilitada e sem navegação explícita. Menu próprio: minha conta, ranking, organizar e demonstração; login e inscrição alternados, confirmação e chave separadas, ranking com última rodada pontuada e destaque do próprio time. Administração dividida em inscrições, convites e pontos; atalhos de pontuação na lista. Paleta preservada, sem migração, sem senha definitiva ou escalação real. Testar navegação mobile, convites, acesso e pontuação antes do piloto.

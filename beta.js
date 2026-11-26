@@ -187,9 +187,9 @@ export async function betaRoute(req,env,path,readInput,json){
  if(path==='/api/beta/me'&&method==='GET'){return reply({member:await member(db,req)});}
  if(path==='/api/beta/ranking'&&method==='GET'){
   const m=await member(db,req);if(m.status!=='approved')fail(403,'Aguarde a aprovação do administrador.');
-  const round=Number(new URL(req.url).searchParams.get('round')||38);if(!Number.isInteger(round)||round<1||round>38)fail(400,'Rodada inválida');
-  const rows=await db.prepare("SELECT m.team_name AS name,COUNT(s.round) AS played,COALESCE(SUM(s.points),0) AS total,MAX(CASE WHEN s.round=? THEN s.points END) AS roundPoints FROM beta_members m LEFT JOIN beta_scores s ON s.member_id=m.id AND s.round<=? WHERE m.status='approved' GROUP BY m.id,m.team_name ORDER BY CASE WHEN COUNT(s.round)>0 THEN 0 ELSE 1 END,total DESC,m.team_name,m.id").bind(round,round).all();
-  const ranking=rows.results.map((r,i)=>({...r,position:r.played?i+1:null}));
+  const requested=new URL(req.url).searchParams.get('round')||'38';const round=requested==='latest'?(await db.prepare("SELECT COALESCE(MAX(s.round),1) AS round FROM beta_scores s JOIN beta_members m ON m.id=s.member_id WHERE m.status='approved'").first()).round:Number(requested);if(!Number.isInteger(round)||round<1||round>38)fail(400,'Rodada inválida');
+  const rows=await db.prepare("SELECT m.id AS memberId,m.team_name AS name,COUNT(s.round) AS played,COALESCE(SUM(s.points),0) AS total,MAX(CASE WHEN s.round=? THEN s.points END) AS roundPoints FROM beta_members m LEFT JOIN beta_scores s ON s.member_id=m.id AND s.round<=? WHERE m.status='approved' GROUP BY m.id,m.team_name ORDER BY CASE WHEN COUNT(s.round)>0 THEN 0 ELSE 1 END,total DESC,m.team_name,m.id").bind(round,round).all();
+  const ranking=rows.results.map(({memberId,...r},i)=>({...r,mine:memberId===m.id,position:r.played?i+1:null}));
   return reply({round,source:'manual',ranking,summary:{participants:ranking.length,scored:ranking.filter(r=>r.played>0).length,leader:ranking.find(r=>r.played>0)?.name??null,latestRound:ranking.some(r=>r.roundPoints!==null)?round:null},payments:false});
  }
  return reply({error:'Recurso não encontrado'},404);

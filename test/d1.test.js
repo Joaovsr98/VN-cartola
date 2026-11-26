@@ -152,3 +152,19 @@ test('beta: busca, filtros, correção de ID sem pontos e proteção dos registr
  const ranking=await(await call('/api/beta/ranking?round=36',{headers:session})).json();
  assert.equal(ranking.summary.participants,1);assert.equal(ranking.summary.leader,'Aurora FC');assert.equal(ranking.ranking[0].total,9541);
 });
+
+test('beta: última rodada com pontos e destaque somente do próprio time',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';
+ const post=(data,extra={})=>({method:'POST',headers:{'Content-Type':'application/json',Origin:'https://arena.test',...extra},body:JSON.stringify(data)});
+ const admin={Authorization:'Bearer '+env.ADMIN_API_TOKEN};
+ const {invite}=await(await call('/api/beta/admin/invites',post({mode:'group'},admin))).json();
+ const reg=async(externalId)=>await(await call('/api/beta/register',post({invite,teamName:'Time '+externalId,externalId,consent:true}))).json();
+ const a=await reg('91');await reg('92');
+ for(const row of db.prepare('SELECT id,external_id FROM beta_members').all()){
+  assert.equal((await call('/api/beta/admin/decision',post({id:row.id,status:'approved'},admin))).status,200);
+  assert.equal((await call('/api/beta/admin/score',post({id:row.id,round:36,points:row.external_id==='91'?95.41:80},admin))).status,200);
+ }
+ const login=await call('/api/beta/login',post({accessKey:a.accessKey})),session={Cookie:login.headers.get('Set-Cookie').split(';')[0]};
+ const d=await(await call('/api/beta/ranking?round=latest',{headers:session})).json();
+ assert.equal(d.round,36);assert.equal(d.ranking.filter(x=>x.mine).length,1);assert.equal(d.ranking[0].mine,true);assert.equal(d.ranking[0].name,'Time 91');assert.ok(d.ranking.every(x=>!('memberId' in x)));
+});
