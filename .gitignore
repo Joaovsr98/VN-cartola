@@ -8,3 +8,6 @@ backups/
 
 .env.*
 !.env.example
+
+.wrangler/
+.dev.vars*
