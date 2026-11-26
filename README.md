@@ -117,3 +117,6 @@ Adaptador experimental somente leitura para consulta por ID e rodada, restrito a
 
 ### v0.8.5 — Piloto 2026
 Painel administrativo separado: lote manual de até 20 times, prévia e confirmação, SQL com condição de integridade para não salvar parte de um lote inválido. Ranking atualiza a partir do D1 a cada minuto apenas quando visível. Consultas externas preparadas por nome, mercado, pontos e estimativa de titulares com técnico/capitão; cache de 60 s em slots fixos e limite global de 15 s por ação. Reservas e temporada não validadas; nenhuma estimativa entra no ranking. Ativação externa continua desligada até autorização da fonte. Não reutilizar pontuações do piloto 2026 na temporada 2027 sem definir migração/isolamento. Não há migração adicional, custos ou senha Globo. Checklist: cadastro, aprovação, login do jogador, lote, classificação, logout e verificação em celular. 
+
+### v0.8.6 — Divulgação WhatsApp
+Aba administrativa WhatsApp: Mito do Turno, Melhor da Rodada, Top 32 (provisório até completar as 18 rodadas; empate no corte exige definição), e duelo de ida/volta informado pelo organizador. Cópia e abertura do WhatsApp sem envio automático. Calendário e regra de pontos por vitória/empate ainda não definidos. Sem migração.

@@ -184,3 +184,17 @@ test('beta: lote validado, autorização e transação sem gravação parcial',a
  const saved=await(await call(route,post({...input,apply:true}))).json();assert.equal(saved.count,2);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,2);
  for(const operation of ['search','market','partial'])assert.equal((await call('/api/beta/admin/cartola/'+operation,post({}))).status,403);
 });
+
+test('beta: divulgação usa pontos reais, exige admin e distingue classificação provisória',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';
+ const headers={Authorization:'Bearer '+env.ADMIN_API_TOKEN,Origin:'https://arena.test','Content-Type':'application/json'};
+ const post=data=>({method:'POST',headers,body:JSON.stringify(data)});
+ const route='/api/beta/admin/share?start=20&round=36&a=123&b=124&leg=volta';
+ assert.equal((await call(route)).status,401);
+ assert.equal((await call('/api/beta/admin/manual',post({authorized:true,teams:[{externalId:'123',teamName:'Time A'},{externalId:'124',teamName:'Time B'}]}))).status,201);
+ assert.equal((await call('/api/beta/admin/scores/batch',post({round:35,rows:'123;100\n124;0',apply:true}))).status,200);
+ assert.equal((await call('/api/beta/admin/scores/batch',post({round:36,rows:'123;80\n124;90',apply:true}))).status,200);
+ const r=await call(route,{headers});assert.equal(r.status,200);const d=await r.json();
+ assert.equal(d.complete,false);assert.match(d.messages.mito,/Time A.*100,00/);assert.match(d.messages.better,/🥇 Time B/);assert.match(d.messages.top,/1º Time A.*180,00/);assert.match(d.messages.top,/provisória/);assert.match(d.messages.duel,/Vencedor: Time B/);assert.match(d.messages.duel,/Volta/);
+ assert.equal((await call('/api/beta/admin/share?start=25&round=36',{headers})).status,400);
+});

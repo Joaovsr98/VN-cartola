@@ -2,6 +2,7 @@ import {authorizeAdmin} from './d1.js';
 import {validScore} from './core.js';
 import {cartolaEnabled,readCartolaTeam,readCartolaSearch,readCartolaMarket,readCartolaLineup,readCartolaAthletes,estimatePartial} from './cartola-provider.js';
 import {scoreBatchInput,scoreBatchStatements} from './pilot-scores.js';
+import {shareReports} from './share-reports.js';
 const fail=(status,message)=>{throw Object.assign(Error(message),{status});};
 const token=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),x=>x.toString(16).padStart(2,'0')).join('');
 const hash=async s=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))),x=>x.toString(16).padStart(2,'0')).join('');
@@ -60,6 +61,7 @@ export async function betaRoute(req,env,path,readInput,json){
    return reply({ok:true},200,adminCookie('',0));
   }
   await requireAdmin(req,env);
+  if(path==='/api/beta/admin/share'&&method==='GET')return reply(await shareReports(db,new URL(req.url).searchParams));
   if(path==='/api/beta/admin/cartola/status'&&method==='GET')return reply({enabled:cartolaEnabled(env),mode:'read-only-preview'});
   if(path.startsWith('/api/beta/admin/cartola/')&&method==='POST'){
    if(!cartolaEnabled(env))fail(403,'Integração externa desativada. É necessária autorização da fonte.');
