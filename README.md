@@ -51,3 +51,6 @@ Página inicial, menu inferior, seleção de time fictício para visualizar (sem
 
 ### v0.6.5 — Mercado demonstrativo
 Mercado de 48 atletas fictícios, quatro formações, 11 titulares e técnico, escolha de capitão, filtro de posição, busca, orçamento de C$145,75, preenchimento automático pelo menor custo e salvamento local de escalação completa. Não inclui reservas no editor, nem sincronização de contas, resultados ou escalações reais. O simulador roda no navegador e não consome consultas adicionais ao Worker. Uniformes genéricos coloridos, sem escudos oficiais. Testes das regras de escalação adicionados.
+
+### v0.6.6 — Central de competições e favoritos
+Favoritos locais por liga, atalhos no início e menu Mais, central de campeonato, mata-mata e mito, regulamento demonstrativo e histórico somente para temporadas completas na base simulada. O término é inferido da presença de todos os resultados, não de homologação oficial; o fechamento administrativo real e armazenamento de temporadas anteriores continuam pendentes. Nenhum prêmio financeiro, cobrança ou notificação push está ativo. O Docker conserva os recursos anteriores; a central usa os dados demonstrativos da prévia Cloudflare. Novos testes de conclusão e dados ausentes.
