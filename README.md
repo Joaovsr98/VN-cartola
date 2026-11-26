@@ -42,3 +42,6 @@ O nome em wrangler.jsonc deve coincidir com o Worker criado: vn-cartola. Configu
 
 ### v0.6.2 — Ranking detalhado (prévia)
 Pesquisa por time/cartoleiro, ordenação por total acumulado até a rodada selecionada ou pontos da rodada, evolução da posição, patrimônio e variação simulados, capitão, diferença para o líder, escudos tipográficos próprios e escalações fictícias (11 titulares + 5 reservas). A soma dos pontos individuais demonstrativos corresponde aos pontos da rodada; não representa a regra oficial de pontuação. Rodadas sem resultados não geram parciais, patrimônio ou escalação. Todos os dados são fictícios. Sem pagamentos e sem API externa. A branch D1 continua separada; este bloco não ativa o banco remoto.
+
+### v0.6.3 — Experiência de competição
+Pódio parcial até a rodada escolhida, campo demonstrativo 4-3-3 ao abrir um time, e mata-mata por fases em colunas navegáveis. O chaveamento segue o motor existente; não são traçadas conexões fixas entre confrontos. O pódio não declara campeão antecipadamente. Dados fictícios, sem pagamentos, sem banco remoto. Testes de pódio e formação foram acrescentados; execução em navegador e deploy dependem de validação.

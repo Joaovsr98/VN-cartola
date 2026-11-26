@@ -15,7 +15,8 @@ export function lineup(team,round,points){
   if(starter)allocated+=value;
   return {name:i===captainIndex?captainNames[(team.id+round)%captainNames.length]:names[(i+team.id)%names.length],position:positions[i],club:clubs[(team.id+i)%clubs.length],captain:i===captainIndex,starter,points:value};
  });
- return {teamId:team.id,round,points,players,simulated:true};
+ const formation=[['ATA'],['MEI'],['LAT','ZAG'],['GOL']].map((positions,i)=>({label:['Ataque','Meio-campo','Defesa','Goleiro'][i],players:players.filter(p=>p.starter&&positions.includes(p.position))}));
+ return {teamId:team.id,round,points,players,formation,formationLabel:'4-3-3',simulated:true};
 }
 export function richRanking(teams,scores,league,round){
  const end=Math.min(round,league.end_round);
