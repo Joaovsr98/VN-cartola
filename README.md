@@ -105,3 +105,6 @@ Cabeçalho de ponta a ponta, hero compacto, navegação mobile fixa com acesso d
 
 ### v0.8.1 — Usabilidade do piloto
 Liga privada abre por padrão quando habilitada e sem navegação explícita. Menu próprio: minha conta, ranking, organizar e demonstração; login e inscrição alternados, confirmação e chave separadas, ranking com última rodada pontuada e destaque do próprio time. Administração dividida em inscrições, convites e pontos; atalhos de pontuação na lista. Paleta preservada, sem migração, sem senha definitiva ou escalação real. Testar navegação mobile, convites, acesso e pontuação antes do piloto.
+
+### v0.8.2 — Administração independente
+A área de organização fica em `/admin/`, com HTML e JavaScript próprios. A interface da liga não contém o painel administrativo da beta nem consulta seus endpoints. A sessão administrativa existente e a autorização server-side continuam válidas; a página de login pode ser acessada por URL, mas dados e operações exigem autorização. Sem migração ou custos. A rota administrativa não deve ser indexada e é servida sem cache. Validar deploy, login, navegação e logout em homologação.

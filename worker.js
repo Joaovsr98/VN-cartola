@@ -4,7 +4,7 @@ import {richRanking,lineup,demoTotal,compareTeams,recordedLineup} from './demo-r
 import {competition} from './competition.js';
 import {checkDb,readLeagues,readLeague,authorizeAdmin,writeScore} from './d1.js';
 import {betaRoute} from './beta.js';
-const VERSION='0.8.1';
+const VERSION='0.8.2';
 const pilot={id:1,name:'Pernas de Pau • Liga piloto',season:2027,start_round:20,end_round:38,knockout_start:30,knockout_size:16};
 const allTeams=['Atlético Aurora','Furacão FC','Vila United','Estrela FC','Real Zona Sul','Tricolor 27','Bola na Rede','Canarinho FC','Arena City','Alvorada','União FC','Guerreiros','Império FC','Fênix','Nova Geração','Raça FC'].map((name,i)=>({id:i+1,name,status:'approved'}));
 const allScores=allTeams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:demoTotal(id,round)};}));
@@ -20,7 +20,8 @@ async function handle(req,env){
  const url=new URL(req.url),p=url.pathname;
  if(!p.startsWith('/api/')){
   if(!['GET','HEAD'].includes(req.method))return json({error:'Método não permitido'},405);
-  const r=await env.ASSETS.fetch(req),h=new Headers(r.headers);for(const [k,v] of Object.entries(headers))h.set(k,v);
+  if(p==='/admin'){const target=new URL(req.url);target.pathname='/admin/';return new Response(null,{status:308,headers:{...headers,Location:target.href,'Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}});}
+  const r=await env.ASSETS.fetch(req),h=new Headers(r.headers);if(p.startsWith('/admin/')){h.set('Cache-Control','no-store');h.set('X-Robots-Tag','noindex, nofollow');}for(const [k,v] of Object.entries(headers))h.set(k,v);
   if(req.method==='GET'&&h.get('Content-Type')?.includes('text/html')){
    const html=(await r.text()).replace(/<button data-tab="(?:join|admin)">[^<]*<\/button>/g,'').replace('AMBIENTE DE TESTE · Dados fictícios · Sem pagamentos','PRÉVIA CLOUDFLARE · Dados fictícios · Cadastro e administração desativados');h.delete('Content-Length');h.delete('ETag');h.set('Cache-Control','no-store');return new Response(html,{status:r.status,headers:h});
   }
