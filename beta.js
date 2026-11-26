@@ -1,6 +1,7 @@
 import {authorizeAdmin} from './d1.js';
 import {validScore} from './core.js';
-import {cartolaEnabled,readCartolaTeam} from './cartola-provider.js';
+import {cartolaEnabled,readCartolaTeam,readCartolaSearch,readCartolaMarket,readCartolaLineup,readCartolaAthletes,estimatePartial} from './cartola-provider.js';
+import {scoreBatchInput,scoreBatchStatements} from './pilot-scores.js';
 const fail=(status,message)=>{throw Object.assign(Error(message),{status});};
 const token=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),x=>x.toString(16).padStart(2,'0')).join('');
 const hash=async s=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))),x=>x.toString(16).padStart(2,'0')).join('');
@@ -29,6 +30,13 @@ async function member(db,req){
  if(!row)fail(401,'Sessão inválida ou expirada.');return row;
 }
 async function login(db,id,accessHash){const key=token(),time=now(),ttl=7*86400;const [,saved]=await db.batch([db.prepare('DELETE FROM beta_sessions WHERE expires_at<=?').bind(time),db.prepare('INSERT INTO beta_sessions SELECT ?,id,? FROM beta_members WHERE id=? AND access_hash=?').bind(await hash(key),time+ttl,id,accessHash)]);if(saved.meta.changes!==1)fail(401,'Chave inválida.');return cookie(key,ttl);}
+// Fixed cache slots avoid accumulating participant records and arbitrary search queries.
+async function externalCache(db,slot,key,load){
+ const name='cartola-cache:'+slot,time=now(),old=await db.prepare('SELECT value FROM arena_meta WHERE key=?').bind(name).first();
+ if(old)try{const hit=JSON.parse(old.value);if(hit.key===key&&hit.expires>time)return hit.data;}catch{}
+ const data=await load();await db.prepare('INSERT INTO arena_meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(name,JSON.stringify({key,expires:now()+60,data})).run();return data;
+}
+async function externalLimit(db){const time=now(),limit=await db.prepare("INSERT INTO arena_meta(key,value) VALUES ('cartola-preview-after',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE CAST(arena_meta.value AS INTEGER)<=?").bind(String(time+15),time).run();if(limit.meta.changes!==1)fail(429,'Aguarde 15 segundos antes de consultar novamente.');}
 function cleanName(s){if(typeof s!=='string')return '';return s.trim().replace(/\s+/g,' ');}
 export async function betaRoute(req,env,path,readInput,json){
  const reply=(data,status=200,session=null)=>{const r=json(data,status);if(session)r.headers.set('Set-Cookie',session);return r;};
@@ -53,12 +61,35 @@ export async function betaRoute(req,env,path,readInput,json){
   }
   await requireAdmin(req,env);
   if(path==='/api/beta/admin/cartola/status'&&method==='GET')return reply({enabled:cartolaEnabled(env),mode:'read-only-preview'});
-  if(path==='/api/beta/admin/cartola/preview'&&method==='POST'){
+  if(path.startsWith('/api/beta/admin/cartola/')&&method==='POST'){
    if(!cartolaEnabled(env))fail(403,'Integração externa desativada. É necessária autorização da fonte.');
-   const d=await readInput(req);if(!validToken(d.id)||!Number.isInteger(d.round)||d.round<1||d.round>38)fail(400,'Selecione um time e uma rodada válidos.');
+   const operation=path.split('/').at(-1),d=await readInput(req);
+   if(!['search','market','preview','partial'].includes(operation))fail(404,'Consulta não encontrada.');
+   if(operation==='search'){
+    if(typeof d.query!=='string'||d.query.trim().length<2||d.query.trim().length>60||/[\x00-\x1f\x7f]/.test(d.query))fail(400,'Informe de 2 a 60 caracteres do nome do time.');
+    const q=d.query.trim();await externalLimit(db);return reply(await externalCache(db,'search',q,()=>readCartolaSearch(q)));
+   }
+   if(operation==='market'){await externalLimit(db);return reply(await externalCache(db,'market','current',()=>readCartolaMarket()));}
+   if(!validToken(d.id)||!Number.isInteger(d.round)||d.round<1||d.round>38)fail(400,'Selecione um time e uma rodada válidos.');
    const m=await db.prepare("SELECT external_id FROM beta_members WHERE id=? AND status='approved'").bind(d.id).first();if(!m||!/^[1-9]\d{0,15}$/.test(m.external_id))fail(404,'Time aprovado com ID externo válido não encontrado.');
-   const time=now(),limit=await db.prepare("INSERT INTO arena_meta(key,value) VALUES ('cartola-preview-after',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE CAST(arena_meta.value AS INTEGER)<=?").bind(String(time+15),time).run();if(limit.meta.changes!==1)fail(429,'Aguarde 15 segundos antes de consultar novamente.');
-   return reply(await readCartolaTeam({externalId:m.external_id,round:d.round}));
+   await externalLimit(db);const input={externalId:m.external_id,round:d.round},key=m.external_id+':'+d.round;
+   if(operation==='preview')return reply(await externalCache(db,'team',key,()=>readCartolaTeam(input)));
+   const market=await externalCache(db,'market','current',()=>readCartolaMarket());
+   if(market.round!==d.round||market.status!==2)fail(409,'As parciais exigem mercado fechado e a rodada atual confirmada.');
+   const [lineup,athletes]=await Promise.all([externalCache(db,'lineup',key,()=>readCartolaLineup(input)),externalCache(db,'athletes',String(d.round),()=>readCartolaAthletes(d.round))]);
+   return reply(estimatePartial(lineup,athletes));
+  }
+  if(path==='/api/beta/admin/scores/batch'&&method==='POST'){
+   const d=await readInput(req),input=scoreBatchInput(d),ids=input.rows.map(r=>r.externalId),slots=ids.map(()=>'?').join(',');
+   if(d.apply!==true&&d.apply!==false)fail(400,'Escolha validar ou salvar o lote.');
+   if(!d.apply){
+    const members=await db.prepare("SELECT m.external_id,m.team_name,m.status,s.points AS previous FROM beta_members m LEFT JOIN beta_scores s ON s.member_id=m.id AND s.round=? WHERE m.external_id IN ("+slots+")").bind(input.round,...ids).all(),map=new Map(members.results.map(m=>[m.external_id,m]));
+    const rows=input.rows.map(r=>{const m=map.get(r.externalId);return {...r,teamName:m?.team_name??null,previous:m?.previous??null,valid:m?.status==='approved'};});
+    return reply({round:input.round,rows,valid:rows.every(r=>r.valid),saved:false});
+   }
+   const [written,audit]=await db.batch(scoreBatchStatements(db,input,now()));
+   if(written.meta.changes!==ids.length||audit.meta.changes!==ids.length)fail(409,'Lote não salvo. Confirme se todos os IDs pertencem a times aprovados.');
+   return reply({round:input.round,saved:true,count:ids.length,source:'manual'});
   }
   if(path==='/api/beta/admin/invites'&&method==='POST'){
    const d=await readInput(req);if(d.mode!==undefined&&!['group','individual'].includes(d.mode))fail(400,'Tipo de convite inválido.');
@@ -199,7 +230,8 @@ export async function betaRoute(req,env,path,readInput,json){
   const requested=new URL(req.url).searchParams.get('round')||'38';const round=requested==='latest'?(await db.prepare("SELECT COALESCE(MAX(s.round),1) AS round FROM beta_scores s JOIN beta_members m ON m.id=s.member_id WHERE m.status='approved'").first()).round:Number(requested);if(!Number.isInteger(round)||round<1||round>38)fail(400,'Rodada inválida');
   const rows=await db.prepare("SELECT m.id AS memberId,m.team_name AS name,COUNT(s.round) AS played,COALESCE(SUM(s.points),0) AS total,MAX(CASE WHEN s.round=? THEN s.points END) AS roundPoints FROM beta_members m LEFT JOIN beta_scores s ON s.member_id=m.id AND s.round<=? WHERE m.status='approved' GROUP BY m.id,m.team_name ORDER BY CASE WHEN COUNT(s.round)>0 THEN 0 ELSE 1 END,total DESC,m.team_name,m.id").bind(round,round).all();
   const ranking=rows.results.map(({memberId,...r},i)=>({...r,mine:memberId===m.id,position:r.played?i+1:null}));
-  return reply({round,source:'manual',ranking,summary:{participants:ranking.length,scored:ranking.filter(r=>r.played>0).length,leader:ranking.find(r=>r.played>0)?.name??null,latestRound:ranking.some(r=>r.roundPoints!==null)?round:null},payments:false});
+  const update=await db.prepare("SELECT MAX(a.created_at) AS updated FROM beta_audit a JOIN beta_members m ON m.id=a.member_id WHERE a.action='score' AND m.status='approved'").first();
+  return reply({round,source:'manual',updatedAt:update?.updated??null,ranking,summary:{participants:ranking.length,scored:ranking.filter(r=>r.played>0).length,leader:ranking.find(r=>r.played>0)?.name??null,latestRound:ranking.some(r=>r.roundPoints!==null)?round:null},payments:false});
  }
  return reply({error:'Recurso não encontrado'},404);
 }

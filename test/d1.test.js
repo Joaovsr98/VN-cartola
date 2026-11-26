@@ -170,3 +170,17 @@ test('beta: última rodada com pontos e destaque somente do próprio time',async
 });
 
 test('beta: consulta externa exige administrador e ativação explícita',async t=>{const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';const admin={Authorization:'Bearer '+env.ADMIN_API_TOKEN};assert.equal((await call('/api/beta/admin/cartola/status')).status,401);assert.equal((await(await call('/api/beta/admin/cartola/status',{headers:admin})).json()).enabled,false);const r=await call('/api/beta/admin/cartola/preview',{method:'POST',headers:{...admin,Origin:'https://arena.test','Content-Type':'application/json'},body:JSON.stringify({id:'a'.repeat(64),round:36})});assert.equal(r.status,403);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,0);});
+
+test('beta: lote validado, autorização e transação sem gravação parcial',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';
+ const admin={Authorization:'Bearer '+env.ADMIN_API_TOKEN};
+ const post=(data,headers=admin)=>({method:'POST',headers:{'Content-Type':'application/json',Origin:'https://arena.test',...headers},body:JSON.stringify(data)});
+ const route='/api/beta/admin/scores/batch';
+ assert.equal((await call('/api/beta/admin/manual',post({authorized:true,teams:[{externalId:'123',teamName:'Time A'},{externalId:'124',teamName:'Time B'}]}))).status,201);
+ const input={round:36,rows:'123;95,41\n124;0'};
+ assert.equal((await call(route,post({...input,apply:true},{}))).status,401);
+ const preview=await(await call(route,post({...input,apply:false}))).json();assert.equal(preview.valid,true);assert.equal(preview.saved,false);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,0);
+ assert.equal((await call(route,post({round:36,rows:'123;20\n999;30',apply:true}))).status,409);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,0);
+ const saved=await(await call(route,post({...input,apply:true}))).json();assert.equal(saved.count,2);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,2);
+ for(const operation of ['search','market','partial'])assert.equal((await call('/api/beta/admin/cartola/'+operation,post({}))).status,403);
+});
