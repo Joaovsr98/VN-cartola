@@ -56,7 +56,7 @@ export async function betaRoute(req,env,path,readInput,json){
   if(path==='/api/beta/admin/cartola/preview'&&method==='POST'){
    if(!cartolaEnabled(env))fail(403,'Integração externa desativada. É necessária autorização da fonte.');
    const d=await readInput(req);if(!validToken(d.id)||!Number.isInteger(d.round)||d.round<1||d.round>38)fail(400,'Selecione um time e uma rodada válidos.');
-   const m=await db.prepare("SELECT external_id FROM beta_members WHERE id=? AND status='approved'").bind(d.id).first();if(!m||!/^[1-9]\\d{0,15}$/.test(m.external_id))fail(404,'Time aprovado com ID externo válido não encontrado.');
+   const m=await db.prepare("SELECT external_id FROM beta_members WHERE id=? AND status='approved'").bind(d.id).first();if(!m||!/^[1-9]\d{0,15}$/.test(m.external_id))fail(404,'Time aprovado com ID externo válido não encontrado.');
    const time=now(),limit=await db.prepare("INSERT INTO arena_meta(key,value) VALUES ('cartola-preview-after',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE CAST(arena_meta.value AS INTEGER)<=?").bind(String(time+15),time).run();if(limit.meta.changes!==1)fail(429,'Aguarde 15 segundos antes de consultar novamente.');
    return reply(await readCartolaTeam({externalId:m.external_id,round:d.round}));
   }
