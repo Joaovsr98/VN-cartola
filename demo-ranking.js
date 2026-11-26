@@ -3,6 +3,7 @@ const captainNames=['Caio Luz','Davi Prado','Ravi Monte','Breno Vale','Iuri Lago
 const names=['João Luz','Caio Prado','Ravi Monte','Breno Vale','Iuri Lago','Nilo Reis','Theo Costa','Luan Serra','Rafael Sol','Davi Rio','Hugo Campos','Enzo Mar','Leo Dias','Noah Lima','Otávio Melo','Vicente Pires'];
 const positions=['GOL','LAT','ZAG','ZAG','LAT','MEI','MEI','MEI','ATA','ATA','ATA','GOL','ZAG','MEI','ATA','LAT'];
 const clubs=['Aurora','Vila','Estrela','União','Fênix'];
+export const demoPatrimony=(id,round)=>11000+((id*947+round*137)%7900);
 export function lineup(team,round,points){
  if(points==null)return null;
  const captainIndex=8+((team.id+round)%3);
@@ -15,8 +16,11 @@ export function lineup(team,round,points){
   if(starter)allocated+=value;
   return {name:i===captainIndex?captainNames[(team.id+round)%captainNames.length]:names[(i+team.id)%names.length],position:positions[i],club:clubs[(team.id+i)%clubs.length],captain:i===captainIndex,starter,points:value};
  });
+ const patrimony=demoPatrimony(team.id,round),remaining=320+(team.id*11%400),coach={name:'Técnico '+String(team.id).padStart(2,'0'),club:clubs[team.id%clubs.length],price:800+team.id*13,points:null};
+ const budget=patrimony-remaining-coach.price;let spent=0;
+ for(let i=0;i<players.length;i++){const p=players[i];p.price=p.starter?(i===10?budget-spent:Math.floor(budget/11)):600+i*31;if(p.starter)spent+=p.price;}
  const formation=[['ATA'],['MEI'],['LAT','ZAG'],['GOL']].map((positions,i)=>({label:['Ataque','Meio-campo','Defesa','Goleiro'][i],players:players.filter(p=>p.starter&&positions.includes(p.position))}));
- return {teamId:team.id,round,points,players,formation,formationLabel:'4-3-3',simulated:true};
+ return {teamId:team.id,round,points,players,formation,formationLabel:'4-3-3',coach,budget:{patrimony,teamCost:spent+coach.price,remaining},simulated:true};
 }
 export function richRanking(teams,scores,league,round){
  const end=Math.min(round,league.end_round);
@@ -28,6 +32,6 @@ export function richRanking(teams,scores,league,round){
  return current.map(t=>{
   const roundPoints=byRound.get(t.id)??null, prior=previousPositions.get(t.id);
   const profile=lineup(t,round,roundPoints);
-  return {...t,manager:'Cartoleiro '+String(t.id).padStart(2,'0'),crest:t.name.split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase(),roundPoints,movement:roundPoints===null||prior===undefined?null:prior-t.position,patrimony:roundPoints===null?null:11000+((t.id*947+round*137)%7900),valuation:roundPoints===null?null:((t.id*73+round*41)%1101)-550,leaderGap:leader-t.total,captain:profile?.players.find(p=>p.captain)?.name??null};
+  return {...t,manager:'Cartoleiro '+String(t.id).padStart(2,'0'),crest:t.name.split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase(),roundPoints,movement:roundPoints===null||prior===undefined?null:prior-t.position,patrimony:roundPoints===null?null:demoPatrimony(t.id,round),valuation:roundPoints===null?null:((t.id*73+round*41)%1101)-550,leaderGap:leader-t.total,captain:profile?.players.find(p=>p.captain)?.name??null};
  });
 }

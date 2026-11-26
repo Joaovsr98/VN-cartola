@@ -45,3 +45,6 @@ Pesquisa por time/cartoleiro, ordenação por total acumulado até a rodada sele
 
 ### v0.6.3 — Experiência de competição
 Pódio parcial até a rodada escolhida, campo demonstrativo 4-3-3 ao abrir um time, e mata-mata por fases em colunas navegáveis. O chaveamento segue o motor existente; não são traçadas conexões fixas entre confrontos. O pódio não declara campeão antecipadamente. Dados fictícios, sem pagamentos, sem banco remoto. Testes de pódio e formação foram acrescentados; execução em navegador e deploy dependem de validação.
+
+### v0.6.4 — Navegação mobile e meu time
+Página inicial, menu inferior, seleção de time fictício para visualizar (sem autenticação ou edição), orçamento em cartoletas com custo dos titulares e técnico e saldo, calendário ilustrativo sem datas reais, atalhos para estatísticas e eliminatórias. Preços e clubes são sintéticos. Técnico sem pontuação nesta simulação. Sem dados oficiais, pagamentos ou conexão D1. Testes de orçamento e calendário adicionados.
