@@ -1,6 +1,6 @@
 FROM node:22-bookworm-slim AS base
 WORKDIR /app
-COPY --chown=node:node package.json server.js store.js core.js leagues.js provider.js imports.js analytics.js worker.js ./
+COPY --chown=node:node package.json server.js store.js core.js leagues.js provider.js imports.js analytics.js worker.js d1.js ./
 COPY --chown=node:node public ./public
 COPY --chown=node:node scripts ./scripts
 RUN mkdir -p /app/data && chown node:node /app/data
@@ -9,6 +9,7 @@ ENV HOST=0.0.0.0 PORT=3000
 EXPOSE 3000
 
 FROM base AS test
+COPY --chown=node:node migrations ./migrations
 COPY --chown=node:node test ./test
 RUN npm test && node --check public/app.js
 
