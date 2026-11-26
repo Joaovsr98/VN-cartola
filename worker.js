@@ -1,9 +1,10 @@
 import {ranking,bracket} from './core.js';
 import {analytics,simulate} from './analytics.js';
+const VERSION='0.6.1';
 const league={id:1,name:'Pernas de Pau • Liga piloto',season:2027,start_round:20,end_round:38,knockout_start:30,knockout_size:16};
 const teams=['Atlético Aurora','Furacão FC','Vila United','Estrela FC','Real Zona Sul','Tricolor 27','Bola na Rede','Canarinho FC','Arena City','Alvorada','União FC','Guerreiros','Império FC','Fênix','Nova Geração','Raça FC'].map((name,i)=>({id:i+1,name,status:'approved'}));
 const scores=teams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:4200+((i*1379+round*719+i*round*53)%6900)};}));
-const headers={'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"};
+const headers={'X-VN-Arena-Version':VERSION,'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"};
 const json=(data,status=200)=>Response.json(data,{status,headers:{...headers,'Cache-Control':'no-store'}});
 export default {async fetch(req,env){
  const url=new URL(req.url),p=url.pathname;
@@ -11,10 +12,11 @@ export default {async fetch(req,env){
   if(!['GET','HEAD'].includes(req.method))return json({error:'Método não permitido'},405);
   const r=await env.ASSETS.fetch(req),h=new Headers(r.headers);for(const [k,v] of Object.entries(headers))h.set(k,v);
   if(req.method==='GET'&&h.get('Content-Type')?.includes('text/html')){
-   const html=(await r.text()).replace(/<button data-tab="(?:join|admin)">[^<]*<\/button>/g,'').replace('AMBIENTE DE TESTE · Dados fictícios · Sem pagamentos','PRÉVIA CLOUDFLARE · Dados fictícios · Cadastro e administração desativados');h.delete('Content-Length');h.delete('ETag');return new Response(html,{status:r.status,headers:h});
+   const html=(await r.text()).replace(/<button data-tab="(?:join|admin)">[^<]*<\/button>/g,'').replace('AMBIENTE DE TESTE · Dados fictícios · Sem pagamentos','PRÉVIA CLOUDFLARE · Dados fictícios · Cadastro e administração desativados');h.delete('Content-Length');h.delete('ETag');h.set('Cache-Control','no-store');return new Response(html,{status:r.status,headers:h});
   }
   return new Response(r.body,{status:r.status,headers:h});
  }
+ if(req.method==='GET'&&p==='/api/health')return json({ok:true,version:VERSION,mode:'demo',storage:'none',payments:false});
  if(url.searchParams.get('league')!==null&&url.searchParams.get('league')!=='1')return json({error:'Liga não encontrada'},404);
  if(req.method==='GET'&&p==='/api/leagues')return json({leagues:[league]});
  if(req.method==='GET'&&p==='/api/analytics')return json(analytics(league,teams,scores));
