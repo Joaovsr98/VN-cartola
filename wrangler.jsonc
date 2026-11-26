@@ -23,5 +23,6 @@
     "crons": [
       "* * * * *"
     ]
-  }
+  },
+  "keep_vars": true
 }

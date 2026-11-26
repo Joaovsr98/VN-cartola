@@ -132,3 +132,6 @@ Cron em homologação a cada minuto, sem chamadas externas enquanto CARTOLA_READ
 
 ### v0.8.10 — Diagnóstico da fonte externa
 O painel diferencia timeout, conexão/redirecionamento recusado, status HTTP, bloqueio e formato inválido. Falha do mercado, das parciais globais ou bloqueio gera pausa de 15 minutos antes de nova tentativa. Sem alteração de domínio, sem contornar bloqueios, sem mudança das variáveis de autorização. Não expõe conteúdo de resposta nem erros brutos.
+
+### v0.8.11 — Variáveis preservadas em publicações
+Os dois arquivos Wrangler usam `keep_vars: true`, conforme a documentação oficial do Cloudflare. As variáveis de autorização e sincronização continuam administradas no painel do Worker de homologação; não são gravadas no GitHub, não são ativadas por deploy e valores ausentes continuam desabilitados. A configuração não recupera variáveis que já tenham sido removidas. Se necessário, recrie-as com valor `false` até confirmar autorização e validar a fonte. Preserve o segredo ADMIN_API_TOKEN, o D1 e o cron existentes. Se o comando de deploy tiver `--keep-vars=false`, remova essa sobrescrita. A verificação CI exige que os dois arquivos estejam sincronizados, preservem variáveis e não definam as flags externas. Referência: https://developers.cloudflare.com/workers/wrangler/configuration/#source-of-truth
