@@ -54,3 +54,6 @@ Mercado de 48 atletas fictícios, quatro formações, 11 titulares e técnico, e
 
 ### v0.6.6 — Central de competições e favoritos
 Favoritos locais por liga, atalhos no início e menu Mais, central de campeonato, mata-mata e mito, regulamento demonstrativo e histórico somente para temporadas completas na base simulada. O término é inferido da presença de todos os resultados, não de homologação oficial; o fechamento administrativo real e armazenamento de temporadas anteriores continuam pendentes. Nenhum prêmio financeiro, cobrança ou notificação push está ativo. O Docker conserva os recursos anteriores; a central usa os dados demonstrativos da prévia Cloudflare. Novos testes de conclusão e dados ausentes.
+
+### v0.6.7 — Ligas, jogos e compartilhamento
+Catálogo de três ligas fictícias (liga piloto com 16, duas ligas com oito times cada), seleção independente e isolamento de participantes. Jogos ilustrativos nas rodadas 32–34, sem calendário ou probabilidades oficiais; placares apenas na rodada passada. Exportação CSV e compartilhamento do ranking por texto no dispositivo. Não permite criação/inscrição real na prévia Cloudflare; administração local preservada. Sem pagamentos e sem banco remoto.

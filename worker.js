@@ -2,10 +2,16 @@ import {ranking,bracket} from './core.js';
 import {analytics,simulate} from './analytics.js';
 import {richRanking,lineup} from './demo-ranking.js';
 import {competition} from './competition.js';
-const VERSION='0.6.6';
-const league={id:1,name:'Pernas de Pau • Liga piloto',season:2027,start_round:20,end_round:38,knockout_start:30,knockout_size:16};
-const teams=['Atlético Aurora','Furacão FC','Vila United','Estrela FC','Real Zona Sul','Tricolor 27','Bola na Rede','Canarinho FC','Arena City','Alvorada','União FC','Guerreiros','Império FC','Fênix','Nova Geração','Raça FC'].map((name,i)=>({id:i+1,name,status:'approved'}));
-const scores=teams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:4200+((i*1379+round*719+i*round*53)%6900)};}));
+const VERSION='0.6.7';
+const pilot={id:1,name:'Pernas de Pau • Liga piloto',season:2027,start_round:20,end_round:38,knockout_start:30,knockout_size:16};
+const allTeams=['Atlético Aurora','Furacão FC','Vila United','Estrela FC','Real Zona Sul','Tricolor 27','Bola na Rede','Canarinho FC','Arena City','Alvorada','União FC','Guerreiros','Império FC','Fênix','Nova Geração','Raça FC'].map((name,i)=>({id:i+1,name,status:'approved'}));
+const allScores=allTeams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:4200+((i*1379+round*719+i*round*53)%6900)};}));
+const catalog=[{...pilot,description:'Segundo turno e mata-mata',visibility:'demo',teamCount:16},{...pilot,id:11,name:'Copa Arena',description:'Copa demonstrativa de oito times',knockout_size:8,teamCount:8,visibility:'demo'},{...pilot,id:12,name:'Liga dos Amigos',description:'Campeonato demonstrativo de oito times',knockout_size:8,teamCount:8,visibility:'demo'}];
+const fixtures=[
+ {home:'Aurora',away:'Vila',round:33,valid:true},{home:'Estrela',away:'União',round:33,valid:false},{home:'Fênix',away:'Alvorada',round:33,valid:true},
+ {home:'Vila',away:'Estrela',round:34,valid:true},{home:'União',away:'Aurora',round:34,valid:true},
+ {home:'Aurora',away:'Estrela',round:32,valid:true,homeGoals:2,awayGoals:1},{home:'Vila',away:'União',round:32,valid:true,homeGoals:0,awayGoals:0}
+];
 const headers={'X-VN-Arena-Version':VERSION,'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"};
 const json=(data,status=200)=>Response.json(data,{status,headers:{...headers,'Cache-Control':'no-store'}});
 export default {async fetch(req,env){
@@ -19,8 +25,13 @@ export default {async fetch(req,env){
   return new Response(r.body,{status:r.status,headers:h});
  }
  if(req.method==='GET'&&p==='/api/health')return json({ok:true,version:VERSION,mode:'demo',storage:'none',payments:false});
- if(url.searchParams.get('league')!==null&&url.searchParams.get('league')!=='1')return json({error:'Liga não encontrada'},404);
- if(req.method==='GET'&&p==='/api/leagues')return json({leagues:[league]});
+ const raw=url.searchParams.get('league')??'1';
+ const league=catalog.find(l=>String(l.id)===raw);
+ if(!league)return json({error:'Liga não encontrada'},404);
+ const teams=league.id===11?allTeams.slice(0,8):league.id===12?allTeams.slice(8):allTeams;
+ const ids=new Set(teams.map(t=>t.id));
+ const scores=allScores.filter(s=>ids.has(s.teamId));
+ if(req.method==='GET'&&p==='/api/leagues')return json({leagues:catalog});
  if(req.method==='GET'&&p==='/api/analytics')return json(analytics(league,teams,scores));
  if(req.method==='GET'&&p==='/api/team'){
   const id=Number(url.searchParams.get('id')),round=Number(url.searchParams.get('round')||32);
@@ -33,7 +44,7 @@ export default {async fetch(req,env){
   const round=Number(url.searchParams.get('round')||32);if(!Number.isInteger(round)||round<1||round>38)return json({error:'Rodada inválida'},400);
   const richRank=richRanking(teams,scores,league,round),podium=richRank.filter(t=>t.played>0).slice(0,3).map(({id,name,crest,position,total})=>({id,name,crest,position,total}));
   const rank=ranking(teams,scores,20,38),best=rank.filter(t=>t.best!==null).sort((a,b)=>b.best-a.best||a.id-b.id)[0]||null;
-  return json({league,source:{mode:'demo',live:false,label:'Dados fictícios'},rank,richRank,podium,competition:competition(league,teams,scores),round,latestDemoRound:32,fixtures:[{home:'Aurora',away:'Vila',round:33},{home:'Estrela',away:'União',round:33},{home:'Fênix',away:'Alvorada',round:33}],roundRank:ranking(teams,scores,round,round).filter(t=>t.played),best,bracket:bracket(teams,scores),approved:teams.length});
+  return json({league,source:{mode:'demo',live:false,label:'Dados fictícios'},rank,richRank,podium,competition:competition(league,teams,scores),round,latestDemoRound:32,fixtures,roundRank:ranking(teams,scores,round,round).filter(t=>t.played),best,bracket:bracket(teams,scores,{qualStart:league.start_round,qualEnd:league.knockout_start-1,start:league.knockout_start,size:league.knockout_size}),approved:teams.length});
  }
  if(req.method==='POST'&&p==='/api/simulate'){
   if(req.headers.get('sec-fetch-site')==='cross-site')return json({error:'Origem inválida'},403);

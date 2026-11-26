@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {rankingCsv,rankingText} from '../public/share.js';
+test('CSV preserva decimais, protege fórmulas e aspas',()=>{const s=rankingCsv('Liga',32,[{position:1,name:'=1+1',manager:'A" B',roundPoints:9850,total:123456}]);assert.ok(s.startsWith('\uFEFF'));assert.ok(s.includes('"\'=1+1"'));assert.ok(s.includes('"A"" B"'));assert.ok(s.includes('"98,50"'));assert.ok(s.includes('"1234,56"'));});
+test('texto identifica os dados como demonstrativos',()=>assert.ok(rankingText('Liga',32,[{position:1,name:'Time',total:9850}]).includes('Rodada 32 · dados demonstrativos')));
