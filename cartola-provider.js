@@ -7,7 +7,9 @@ export const cartolaEnabled=env=>env.CARTOLA_READ_AUTHORIZED==='true';
 async function getJson(path,fetcher=upstreamFetch){
  const url='https://api.cartola.globo.com'+path;
  let response;
- try{response=await fetcher(url,{method:'GET',redirect:'error',headers:{Accept:'application/json'},signal:AbortSignal.timeout(5000)});}catch(e){const timeout=e?.name==='TimeoutError'||e?.name==='AbortError';fail(502,timeout?'Tempo limite da consulta externa.':'Falha de conexão com a fonte externa (ou redirecionamento recusado).',timeout?'timeout':'network-or-redirect');}
+ try{response=await fetcher(url,{method:'GET',redirect:'manual',headers:{Accept:'application/json'},signal:AbortSignal.timeout(5000)});}catch(e){const timeout=e?.name==='TimeoutError'||e?.name==='AbortError';fail(502,timeout?'Tempo limite da consulta externa.':'Falha de conexão com a fonte externa (ou redirecionamento recusado).',timeout?'timeout':'network-or-redirect');}
+ // Workers supports manual redirects; reject them without following Location.
+ if(response.status>=300&&response.status<400)fail(502,'Redirecionamento externo recusado.','redirect-refused',response.status);
  if(response.status===404)fail(404,'Time ou rodada não encontrados na fonte externa.','http',404);
  if([401,403,429].includes(response.status))fail(503,'A fonte não autorizou ou limitou a consulta.','access-limited',response.status);
  if(!response.ok)fail(502,'Resposta HTTP externa sem sucesso.','http',response.status);

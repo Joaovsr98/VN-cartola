@@ -5,7 +5,7 @@ const meta=async(db,key)=>(await db.prepare('SELECT value FROM arena_meta WHERE 
 const put=(db,key,value)=>db.prepare('INSERT INTO arena_meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(key,String(value));
 function decode(value){try{return JSON.parse(value);}catch{return null;}}
 export const syncEnabled=env=>cartolaEnabled(env)&&env.CARTOLA_AUTOSYNC_ENABLED==='true';
-const knownCodes=new Set(['timeout','network-or-redirect','http','access-limited','content-type','empty-body','body-limit','body-read','invalid-json','invalid-market']);
+const knownCodes=new Set(['timeout','network-or-redirect','redirect-refused','http','access-limited','content-type','empty-body','body-limit','body-read','invalid-json','invalid-market']);
 function recordFailure(state,e,stage,time){state.issue={stage,code:knownCodes.has(e?.code)?e.code:'unconfirmed-response',httpStatus:Number.isInteger(e?.upstreamStatus)?e.upstreamStatus:null};if(e?.status===503||stage==='market'||stage==='athletes')state.retryAfter=time+900;}
 const defaultSource={market:readCartolaMarket,team:readCartolaTeam,lineup:readCartolaLineup,athletes:readCartolaAthletes};
 export async function syncStatus(env){

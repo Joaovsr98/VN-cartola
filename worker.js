@@ -6,7 +6,7 @@ import {checkDb,readLeagues,readLeague,authorizeAdmin,writeScore} from './d1.js'
 import {betaRoute} from './beta.js';
 import {adminPage} from './admin-page.js';
 import {syncRound} from './cartola-sync.js';
-const VERSION='0.8.11';
+const VERSION='0.8.12';
 const pilot={id:1,name:'Pernas de Pau • Liga piloto',season:2027,start_round:20,end_round:38,knockout_start:30,knockout_size:16};
 const allTeams=['Atlético Aurora','Furacão FC','Vila United','Estrela FC','Real Zona Sul','Tricolor 27','Bola na Rede','Canarinho FC','Arena City','Alvorada','União FC','Guerreiros','Império FC','Fênix','Nova Geração','Raça FC'].map((name,i)=>({id:i+1,name,status:'approved'}));
 const allScores=allTeams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:demoTotal(id,round)};}));
