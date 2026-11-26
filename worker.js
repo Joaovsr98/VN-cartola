@@ -3,7 +3,8 @@ import {analytics,simulate} from './analytics.js';
 import {richRanking,lineup,demoTotal,compareTeams,recordedLineup} from './demo-ranking.js';
 import {competition} from './competition.js';
 import {checkDb,readLeagues,readLeague,authorizeAdmin,writeScore} from './d1.js';
-const VERSION='0.7.1';
+import {betaRoute} from './beta.js';
+const VERSION='0.7.2';
 const pilot={id:1,name:'Pernas de Pau • Liga piloto',season:2027,start_round:20,end_round:38,knockout_start:30,knockout_size:16};
 const allTeams=['Atlético Aurora','Furacão FC','Vila United','Estrela FC','Real Zona Sul','Tricolor 27','Bola na Rede','Canarinho FC','Arena City','Alvorada','União FC','Guerreiros','Império FC','Fênix','Nova Geração','Raça FC'].map((name,i)=>({id:i+1,name,status:'approved'}));
 const allScores=allTeams.flatMap(({id})=>Array.from({length:13},(_,j)=>{const round=20+j,i=id-1;return {teamId:id,round,points:demoTotal(id,round)};}));
@@ -25,6 +26,7 @@ async function handle(req,env){
   }
   return new Response(r.body,{status:r.status,headers:h});
  }
+ if(p.startsWith('/api/beta/'))return betaRoute(req,env,p,readInput,json);
  if(env.DB)await checkDb(env.DB);
  if(req.method==='GET'&&p==='/api/health')return json({ok:true,version:VERSION,mode:'demo',storage:env.DB?'d1':'none',payments:false});
  const raw=url.searchParams.get('league')??'1',id=Number(raw);

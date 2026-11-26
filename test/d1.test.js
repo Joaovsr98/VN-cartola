@@ -8,3 +8,30 @@ function setup(t){
 test('D1: seed matches current simulated scores in all leagues',async t=>{const {db,call}=setup(t);const records=db.prepare('SELECT * FROM scores').all();assert.equal(records.length,416);for(const r of records)assert.equal(r.points,demoTotal(r.team_id,r.round));assert.equal((await(await call('/api/health')).json()).storage,'d1');for(const id of [1,11,12]){const d=await(await call('/api/overview?league='+id+'&round=32')).json();assert.equal(d.approved,id===1?16:8);assert.ok(d.richRank.every(t=>t.captain));}});
 test('D1: writes require auth, respect league, record audit and do not fabricate lineup',async t=>{const {db,call,post,env}=setup(t);const input={teamId:1,round:32,points:98.5};assert.equal((await call('/api/admin/score?league=11',post(input,''))).status,401);assert.equal((await call('/api/admin/score?league=11',post(input,'wrong'))).status,401);assert.equal((await call('/api/admin/score?league=12',post(input))).status,404);assert.equal((await call('/api/admin/score?league=11',post(input))).status,200);const d=await(await call('/api/team?league=11&id=1&round=32')).json();assert.equal(d.points,9850);assert.equal(d.lineup,null);const other=await(await call('/api/team?league=1&id=1&round=32')).json();assert.ok(other.lineup);const rank=await(await call('/api/overview?league=11&round=32')).json();assert.equal(rank.richRank.find(t=>t.id===1).captain,null);assert.equal(db.prepare('SELECT count(*) n FROM audit').get().n,1);delete env.ADMIN_API_TOKEN;assert.equal((await call('/api/admin/score',post(input))).status,503);});
 test('D1: schema errors fail closed and signup remains blocked',async t=>{const {db,call,post}=setup(t);assert.equal((await call('/api/account/register',post({}))).status,403);db.exec("DELETE FROM arena_meta");assert.equal((await call('/api/health')).status,503);assert.equal((await call('/api/overview')).status,503);});
+
+test('closed beta: invite, access key, pending, approval, score and logout',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));
+ const post=(data,extra={})=>({method:'POST',headers:{'Content-Type':'application/json',Origin:'https://arena.test',...extra},body:JSON.stringify(data)});
+ const admin={Authorization:'Bearer '+env.ADMIN_API_TOKEN};
+ assert.equal((await(await call('/api/beta/status')).json()).enabled,false);
+ assert.equal((await call('/api/beta/admin/invites',post({},admin))).status,403);
+ env.BETA_ENABLED='true';
+ assert.equal((await call('/api/beta/admin/invites',post({}))).status,401);
+ const invite=(await(await call('/api/beta/admin/invites',post({},admin))).json()).invite;
+ const data={invite,teamName:'Time beta',externalId:'12345',consent:true};
+ assert.equal((await call('/api/beta/register',post({...data,consent:false}))).status,400);
+ const registered=await call('/api/beta/register',post(data));assert.equal(registered.status,201);const {accessKey}=await registered.json();assert.equal(accessKey.length,64);
+ assert.equal((await call('/api/beta/register',post(data))).status,409);
+ const login=await call('/api/beta/login',post({accessKey}));assert.equal(login.status,200);const header=login.headers.get('Set-Cookie');assert.match(header,/HttpOnly; SameSite=Strict/);const session={Cookie:header.split(';')[0]};
+ assert.equal((await(await call('/api/beta/me',{headers:session})).json()).member.status,'pending');
+ assert.equal((await call('/api/beta/ranking',{headers:session})).status,403);
+ const {members}=await(await call('/api/beta/admin/members',{headers:admin})).json();assert.equal(members.length,1);assert.equal(members[0].access_hash,undefined);
+ const id=members[0].id;assert.equal((await call('/api/beta/admin/score',post({id,round:32,points:90},admin))).status,404);
+ assert.equal((await call('/api/beta/admin/decision',post({id,status:'approved'},admin))).status,200);
+ assert.equal((await call('/api/beta/admin/score',post({id,round:32,points:90},admin))).status,200);
+ const rank=await(await call('/api/beta/ranking?round=32',{headers:session})).json();assert.equal(rank.ranking[0].total,9000);assert.equal(rank.ranking[0].external_id,undefined);
+ assert.equal((await(await call('/api/overview')).json()).approved,16);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM beta_audit').get().n,2);
+ assert.equal((await call('/api/beta/logout',post({},session))).status,200);assert.equal((await call('/api/beta/me',{headers:session})).status,401);
+});
+test('closed beta: blocks cross-origin requests and expired invitations',async t=>{const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';const headers={'Content-Type':'application/json',Origin:'https://arena.test',Authorization:'Bearer '+env.ADMIN_API_TOKEN};const invite=(await(await call('/api/beta/admin/invites',{method:'POST',headers,body:'{}'})).json()).invite;const body=JSON.stringify({invite,teamName:'Time beta',externalId:'12345',consent:true});assert.equal((await call('/api/beta/register',{method:'POST',headers:{...headers,Origin:'https://other.test'},body})).status,403);db.exec('UPDATE beta_invites SET expires_at=0');assert.equal((await call('/api/beta/register',{method:'POST',headers,body})).status,409);});
