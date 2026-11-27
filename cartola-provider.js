@@ -44,7 +44,15 @@ export async function readCartolaTeam({externalId,round},fetcher=upstreamFetch){
  if(safeId(team?.time_id)!==externalId||!name||reportedRound!==round)fail(502,'Não foi possível confirmar o time e a rodada da resposta externa.');
  const points=data?.pontos;if(typeof points!=='number'||!Number.isFinite(points)||points< -1000||points>1000)fail(502,'Pontuação não disponível ou inválida.');
  const season=Number.isInteger(data.temporada)?data.temporada:null;
- return {externalId,teamName:name,round,points:Math.round(points*100)/100,season,source:'external-preview',verifiedSeason:season!==null};
+ // The historical response may omit temporada. Validate the actual round on every starter
+ // rather than using time.rodada_time_id (current team round) or time.temporada_inicial (join year).
+ const athletes=data.atletas;
+ const roundEvidence=Array.isArray(athletes)&&athletes.length===12&&
+   athletes.every(a=>safeId(a?.atleta_id)&&a.rodada_id===round)&&
+   new Set(athletes.map(a=>safeId(a.atleta_id))).size===12;
+ const reserveMismatch=Array.isArray(data.reservas)&&data.reservas.some(a=>a?.rodada_id!==undefined&&a.rodada_id!==round);
+ if((Array.isArray(athletes)&&athletes.some(a=>a?.rodada_id!==undefined&&a.rodada_id!==round))||reserveMismatch)fail(502,'Rodada dos atletas diverge da rodada consultada.');
+ return {externalId,teamName:name,round,points:Math.round(points*100)/100,season,roundEvidence,source:'external-preview',verifiedSeason:season!==null};
 }
 export async function readCartolaLineup({externalId,round},fetcher=upstreamFetch){
  requireId(externalId);requireRound(round);

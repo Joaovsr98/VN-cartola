@@ -7,3 +7,11 @@ test('provider: rejeita ID, rodada, bloqueio e resposta divergente',async()=>{aw
 test('provider: diferencia falhas de transporte, bloqueio e formato',async()=>{await assert.rejects(readCartolaTeam(input,async()=>{throw Object.assign(Error('private detail'),{name:'TimeoutError'});}),{code:'timeout',status:502});await assert.rejects(readCartolaTeam(input,async()=>new Response('',{status:403})),{code:'access-limited',upstreamStatus:403});await assert.rejects(readCartolaTeam(input,async()=>new Response('<html>error</html>',{headers:{'Content-Type':'text/html'}})),{code:'content-type',upstreamStatus:200});await assert.rejects(readCartolaTeam(input,async()=>new Response('',{status:500})),{code:'http',upstreamStatus:500});});
 
 test('provider: modo compatível com Workers e redirecionamentos recusados sem segunda consulta',async()=>{let calls=0;await assert.rejects(readCartolaTeam(input,async(url,options)=>{calls++;assert.equal(options.redirect,'manual');return new Response(null,{status:302,headers:{Location:'https://example.com/'}});}),{code:'redirect-refused',status:502,upstreamStatus:302});assert.equal(calls,1);});
+
+test('provider: formato histórico observado, sem temporada e com rodada atual do time diferente',async()=>{
+ const data={time:{time_id:123,nome:'Time de teste',temporada_inicial:2005,rodada_time_id:37},rodada_atual:36,pontos:95.41015625,atletas:Array.from({length:12},(_,i)=>({atleta_id:i+1,rodada_id:36})),reservas:[{atleta_id:13,rodada_id:36}],capitao_id:1};
+ const d=await readCartolaTeam(input,async()=>Response.json(data));
+ assert.equal(d.points,95.41);assert.equal(d.season,null);assert.equal(d.roundEvidence,true);assert.equal(d.verifiedSeason,false);assert.equal(Object.hasOwn(d,'time'),false);
+ await assert.rejects(readCartolaTeam(input,async()=>Response.json({...data,atletas:data.atletas.map((a,i)=>i===0?{...a,rodada_id:37}:a)})),{status:502});
+ const partial=await readCartolaTeam(input,async()=>Response.json({...data,atletas:data.atletas.slice(0,11)}));assert.equal(partial.roundEvidence,false);
+});

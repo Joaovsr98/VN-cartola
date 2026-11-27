@@ -255,3 +255,17 @@ test('beta: falha de mercado gera diagnóstico e pausa consultas por 15 minutos'
  assert.equal((await syncRound(env,source,160)).state,'backoff');assert.equal(calls,1);
  assert.equal((await syncRound(env,source,1000)).state,'source-limited');assert.equal(calls,2);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM beta_scores').get().n,0);
 });
+
+test('beta: resultado histórico sem temporada usa somente contexto do mercado corrente e rodada validada',async t=>{
+ const {db,env,call}=setup(t);db.exec(readFileSync(new URL('../migrations/0002_beta.sql',import.meta.url),'utf8'));env.BETA_ENABLED='true';env.CARTOLA_READ_AUTHORIZED='true';env.CARTOLA_AUTOSYNC_ENABLED='true';
+ const headers={Authorization:'Bearer '+env.ADMIN_API_TOKEN,Origin:'https://arena.test','Content-Type':'application/json'};
+ assert.equal((await call('/api/beta/admin/manual',{method:'POST',headers,body:JSON.stringify({authorized:true,teams:[{externalId:'123',teamName:'Time A'}]})})).status,201);
+ const source={market:async()=>({season:2026,round:37,status:1}),team:async({externalId,round})=>({externalId,round,points:95.41,season:2025,roundEvidence:true})};
+ assert.equal((await syncRound(env,source,100)).failed,1);
+ source.team=async({externalId,round})=>({externalId,round,points:95.41,season:null,roundEvidence:false});
+ assert.equal((await syncRound(env,source,160)).failed,1);
+ source.team=async({externalId,round})=>({externalId,round,points:95.41,season:null,roundEvidence:true});
+ assert.equal((await syncRound(env,source,220)).updated,1);
+ assert.equal(db.prepare('SELECT points FROM beta_scores WHERE round=36').get().points,9541);
+ assert.equal(JSON.parse(db.prepare("SELECT detail FROM beta_audit WHERE action='score'").get().detail).seasonEvidence,'current-market-context');
+});

@@ -47,11 +47,15 @@ export async function syncRound(env,source=defaultSource,time=clock()){
      await db.prepare("INSERT INTO arena_meta(key,value) SELECT ?,? WHERE EXISTS(SELECT 1 FROM beta_members WHERE id=? AND external_id=? AND status='approved') ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(livePrefix+m.id,JSON.stringify(snapshot),m.id,m.external_id).run();
     }else{
      const d=await source.team({externalId:m.external_id,round});
-     // Historic endpoint must explicitly confirm season before automatic writes.
-     if(d.season!==season||d.round!==round||d.externalId!==m.external_id||typeof d.points!=='number'||!Number.isFinite(d.points)||Math.abs(d.points)>1000)throw Error('Pontuação ou temporada não confirmada.');
+     // The historical endpoint can omit season. Use explicit market context only for the
+     // just-settled round, with 12 matching athlete round IDs, and reject explicit mismatches.
+     const contextual=d.season===null&&d.roundEvidence===true&&market.season===season&&
+      (market.gameOver?round===38:market.status===1&&round===market.round-1);
+     if((d.season!==season&&!contextual)||d.round!==round||d.externalId!==m.external_id||typeof d.points!=='number'||!Number.isFinite(d.points)||Math.abs(d.points)>1000)throw Error('Pontuação ou temporada não confirmada.');
+     const seasonEvidence=contextual?'current-market-context':'explicit-team-season';
      const points=Math.round(d.points*100),condition="m.id=? AND m.external_id=? AND m.status='approved' AND NOT EXISTS(SELECT 1 FROM beta_scores s WHERE s.member_id=m.id AND s.round=?)";
      const [_,written]=await db.batch([
-      db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT m.id,'score',?,? FROM beta_members m WHERE "+condition).bind(JSON.stringify({round,points,source:'cartola',season}),time,m.id,m.external_id,round),
+      db.prepare("INSERT INTO beta_audit(member_id,action,detail,created_at) SELECT m.id,'score',?,? FROM beta_members m WHERE "+condition).bind(JSON.stringify({round,points,source:'cartola',season,seasonEvidence}),time,m.id,m.external_id,round),
       db.prepare("INSERT INTO beta_scores(member_id,round,points) SELECT m.id,?,? FROM beta_members m WHERE "+condition).bind(round,points,m.id,m.external_id,round)
      ]);if(written.meta.changes!==1)continue;
     }
